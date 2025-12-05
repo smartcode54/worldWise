@@ -30,8 +30,8 @@ export default function Login() {
           />
         </div>
 
-        <div>
-          <button>Login</button>
+        <div className={styles.buttons}>
+          <button className={styles.cta}>Login</button>
         </div>
       </form>
     </main>
