@@ -13,7 +13,13 @@ function App() {
           <Route path="/" element={<Homepage />} />
           <Route path="/product" element={<Product />} />
           <Route path="/pricing" element={<Pricing />} />
-          <Route path="/app" element={<AppLayout />} />
+          <Route path="/app" element={<AppLayout />}>
+            <Route index element={<p>Menu</p>} />
+          {/* childer routes are nested under /app */}
+            <Route path ="cities" index element={<p>List of cities</p>} />
+            <Route path ="countries" element={<p>List of countries</p>} />
+            <Route path ="form" element={<p>Form</p>} />
+          </Route>
           <Route path="/login" element={<Login />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
