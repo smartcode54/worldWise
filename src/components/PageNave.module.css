@@ -12,3 +12,6 @@ ul {
     gap: 10px;
 }
 
+.nav :global(.active) {
+    background-color: green;
+}
