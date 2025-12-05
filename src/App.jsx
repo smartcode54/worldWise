@@ -12,7 +12,7 @@ const DATABASE_URL = 'http://localhost:8000';
 
 function App() {
   const [cities, setCities] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     async function fetchCities() {
