@@ -1,3 +1,4 @@
+import { useParams, useNavigate } from 'react-router-dom';
 import styles from "./City.module.css";
 
 const formatDate = (date) =>
@@ -8,14 +9,22 @@ const formatDate = (date) =>
     weekday: "long",
   }).format(new Date(date));
 
-function City() {
-  // TEMP DATA
-  const currentCity = {
-    cityName: "Lisbon",
-    emoji: "🇵🇹",
-    date: "2027-10-31T15:59:59.138Z",
-    notes: "My favorite city so far!",
-  };
+function City({ cities = [] }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  
+  // Find the city by ID
+  const currentCity = cities.find(city => city.id === parseInt(id));
+
+  // Handle case when city is not found
+  if (!currentCity) {
+    return (
+      <div className={styles.city}>
+        <p>City not found</p>
+        <button onClick={() => navigate('/app/cities')}>Back to Cities</button>
+      </div>
+    );
+  }
 
   const { cityName, emoji, date, notes } = currentCity;
 
@@ -52,7 +61,9 @@ function City() {
       </div>
 
       <div>
-        <ButtonBack />
+        <button onClick={() => navigate('/app/cities')}>
+          &larr; Back
+        </button>
       </div>
     </div>
   );
