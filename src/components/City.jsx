@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import styles from "./City.module.css";
 
 const formatDate = (date) =>
@@ -12,6 +12,11 @@ const formatDate = (date) =>
 function City({ cities = [] }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Get latitude and longitude from URL params
+  const lat = searchParams.get("lat");
+  const lng = searchParams.get("lng");
   
   // Find the city by ID
   const currentCity = cities.find(city => city.id === parseInt(id));
@@ -46,6 +51,16 @@ function City({ cities = [] }) {
         <div className={styles.row}>
           <h6>Your notes</h6>
           <p>{notes}</p>
+        </div>
+      )}
+
+      {(lat || lng) && (
+        <div className={styles.row}>
+          <h6>Position</h6>
+          <p>
+            Latitude: {lat || 'Select on list'}, <br />
+            Longitude: {lng || 'Select on list'}
+          </p>
         </div>
       )}
 
