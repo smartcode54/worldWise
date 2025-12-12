@@ -1,5 +1,6 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import styles from "./City.module.css";
+import Button from './Button';
 
 const formatDate = (date) =>
   new Intl.DateTimeFormat("en", {
@@ -76,9 +77,9 @@ function City({ cities = [] }) {
       </div>
 
       <div>
-        <button onClick={() => navigate('/app/cities')}>
+        <Button type="back" onClick={() => navigate(-1)}>
           &larr; Back
-        </button>
+        </Button>
       </div>
     </div>
   );
