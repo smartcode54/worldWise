@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import styles from "./City.module.css";
 import Button from './Button';
+import { useCities } from '../contexts/CitiesContext';
 
 const formatDate = (date) =>
   new Intl.DateTimeFormat("en", {
@@ -10,10 +11,11 @@ const formatDate = (date) =>
     weekday: "long",
   }).format(new Date(date));
 
-function City({ cities = [] }) {
+function City() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { cities } = useCities();
   
   // Get latitude and longitude from URL params
   const lat = searchParams.get("lat");
