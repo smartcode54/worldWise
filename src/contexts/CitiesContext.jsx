@@ -8,6 +8,8 @@ const CitiesContext = createContext();
 function CitiesProvider({ children }) {
   const [cities, setCities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedCityId, setSelectedCityId] = useState(null);
+  const [isLoadingCity, setIsLoadingCity] = useState(false);
 
   useEffect(() => {
     async function fetchCities() {
@@ -30,12 +32,30 @@ function CitiesProvider({ children }) {
     fetchCities();
   }, []);
 
+  const getCity = (id) => {
+    return cities.find(city => city.id === parseInt(id));
+  };
+
+  const handleCityClick = async (cityId) => {
+    setSelectedCityId(cityId);
+    setIsLoadingCity(true);
+    // Simulate loading delay (you can remove this if not needed)
+    setTimeout(() => {
+      setIsLoadingCity(false);
+    }, 1000);
+  };
+
   const value = useMemo(
     () => ({
       cities,
       isLoading,
+      getCity,
+      selectedCityId,
+      isLoadingCity,
+      handleCityClick,
+      setSelectedCityId,
     }),
-    [cities, isLoading]
+    [cities, isLoading, selectedCityId, isLoadingCity]
   );
 
   return (

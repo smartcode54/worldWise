@@ -1,26 +1,46 @@
 import styles from './CityItem.module.css';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
+import { useCities } from '../contexts/CitiesContext';
 
-const formatDate = (date) =>
-  new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    weekday: "long",
-  }).format(new Date(date));
+const formatDate = (date) => {
+  if (!date) return 'No date';
+  try {
+    return new Intl.DateTimeFormat("en", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      weekday: "long",
+    }).format(new Date(date));
+  } catch {
+    return 'Invalid date';
+  }
+};
 
 function CityItem({ city }) {
-     const { cityName, emoji, date, id, position } = city;   
+  const { cityName, emoji, date, id, position } = city;
+  const params = useParams();
+  const currentCityId = params?.id;
+  const { selectedCityId, handleCityClick } = useCities();
+  
+  const isSelected = currentCityId === id.toString() || selectedCityId === id;
+  
+  const handleClick = () => {
+    handleCityClick(id);
+  };
    
-     return (
-       <li>
-         <Link className={styles.cityItem} to={`/app/cities/${id}?lat=${position.lat}&lng=${position.lng}`}>
-           <span className={styles.emoji}>{emoji}</span>
-           <h3 className={styles.name}>{cityName}</h3>
-           <time className={styles.date}>{formatDate(date)}</time>
-           <button className={styles.deleteBtn}>&times;</button>
-         </Link>
-       </li>
-     );
-   }
+  return (
+    <li>
+      <Link 
+        className={`${styles.cityItem} ${isSelected ? styles.cityItemActive : ''}`}
+        to={`/app/cities/${id}${position?.lat && position?.lng ? `?lat=${position.lat}&lng=${position.lng}` : ''}`}
+        onClick={handleClick}
+      >
+        <span className={styles.emoji}>{emoji}</span>
+        <h3 className={styles.name}>{cityName}</h3>
+        <time className={styles.date}>{formatDate(date)}</time>
+        <button className={styles.deleteBtn}>&times;</button>
+      </Link>
+    </li>
+  );
+}
 export default CityItem;
