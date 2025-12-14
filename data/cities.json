@@ -35,54 +35,6 @@
         "lng": 13.376933665713324
       },
       "id": 98443197
-    },
-    {
-      "cityName": "Paris",
-      "country": "France",
-      "emoji": "🇫🇷",
-      "date": "2027-03-15T11:34:22.987Z",
-      "notes": "Beautiful city",
-      "position": {
-        "lat": 48.856614,
-        "lng": 2.3522219
-      },
-      "id": 7546321
-    },
-    {
-      "cityName": "London",
-      "country": "United Kingdom",
-      "emoji": "🇬🇧",
-      "date": "2027-01-10T09:24:11.863Z",
-      "notes": "Beautiful city",
-      "position": {
-        "lat": 51.5073219,
-        "lng": -0.1276474
-      },
-      "id": 789456123
-    },
-    {
-      "cityName": "Manchester",
-      "country": "United Kingdom",
-      "emoji": "🇬🇧",
-      "date": "2027-01-10T09:24:11.863Z",
-      "notes": "Beautiful city",
-      "position": {
-        "lat": 53.480831,
-        "lng": -2.237430
-      },
-      "id": 789456124
-    },
-    {
-      "cityName": "Dubai",
-      "country": "United Arab Emirates",
-      "emoji": "🇦🇪",
-      "date": "2027-01-10T09:24:11.863Z",
-      "notes": "Beautiful city",
-      "position": {
-        "lat": 25.276987,
-        "lng": 55.296233
-      },
-      "id": 789456125
     }
   ]
 }

@@ -6,6 +6,7 @@ export default function BackButton({ type = "back" }) {
   
   const handleClick = (e) => {
     e.preventDefault(); // Prevent form submission if inside a form
+    e.stopPropagation(); // Prevent event bubbling
     navigate(-1);
   };
   

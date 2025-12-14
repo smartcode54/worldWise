@@ -9,6 +9,12 @@
   height: 100%;
 }
 
+/* Ensure Leaflet container has proper height */
+:global(.leaflet-container) {
+  height: 100%;
+  width: 100%;
+}
+
 /* Here we want to style classes that are coming from leaflet. So we want CSS Modules to give us the ACTUAL classnames, not to add some random ID to them, because then they won't match the classnames defined inside the map. The solution is to define these classes as GLOBAL */
 :global(.leaflet-popup .leaflet-popup-content-wrapper) {
   background-color: var(--color-dark--1);
@@ -25,8 +31,10 @@
 }
 
 :global(.leaflet-popup .leaflet-popup-content span:first-child) {
-  font-size: 2.5rem;
+  font-size: 2.6rem;
   line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "EmojiOne Color", "Twemoji Mozilla", "Segoe UI Symbol", sans-serif;
+  display: inline-block;
 }
 
 :global(.leaflet-popup .leaflet-popup-tip) {
