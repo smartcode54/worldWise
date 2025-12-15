@@ -1,4 +1,5 @@
-// "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=0&longitude=0"
+// Using OpenStreetMap Nominatim API - free, no API key required
+// "https://nominatim.openstreetmap.org/reverse?lat=0&lon=0&format=json"
 
 import { useState, useEffect } from "react";
 import Button from "./Button";
@@ -7,7 +8,8 @@ import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
 import { convertToEmoji } from "../utils";
 
-const BASE_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client";
+// Using OpenStreetMap Nominatim - free, no API key required, no IP bans
+const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
 
 // Helper function to format date to datetime-local format
 function formatDateTimeLocal(date) {
@@ -41,9 +43,6 @@ function Form() {
   const [notes, setNotes] = useState("");
   const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
   const [error, setError] = useState("");  // ✅ Add error state
-  
-  // ✅ Create a unique key from coordinates to ensure useEffect triggers on any change
-  const coordKey = lat !== null && lng !== null ? `${lat},${lng}` : null;
 
   useEffect(function(){
     async function fetchCityData() {
@@ -90,19 +89,73 @@ function Form() {
       
       try {
         setIsLoadingGeocoding(true);
-        const res = await fetch(`${BASE_URL}?latitude=${latNum}&longitude=${lngNum}`);
-        if (!res.ok) throw new Error("Failed to fetch city data");
+        // Use URLSearchParams for proper URL encoding
+        // Nominatim API format: lat, lon, format=json
+        const params = new URLSearchParams({
+          lat: latNum.toString(),
+          lon: lngNum.toString(),
+          format: 'json',
+          addressdetails: '1',
+          'accept-language': 'en'
+        });
+        const url = `${BASE_URL}?${params.toString()}`;
+        console.log("Fetching from:", url);
+        
+        // Nominatim requires a User-Agent header
+        const res = await fetch(url, {
+          headers: {
+            'User-Agent': 'WorldWiseApp/1.0' // Required by Nominatim
+          }
+        });
+        
+        if (!res.ok) {
+          // Try to get error details from the response
+          let errorMessage = `Failed to fetch city data (${res.status} ${res.statusText})`;
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error?.message || errorMessage;
+            console.error("API Error Response:", errorData);
+          } catch {
+            // If response is not JSON, use the status text
+            console.error("API Error Status:", res.status, res.statusText);            
+          }
+          throw new Error(errorMessage);
+        }
+        
         const data = await res.json();
-        if (!data.city) {
-          const errorMsg = `No city found for coordinates: lat=${latNum}, lng=${lngNum} please try again`;
+        console.log("Fetched city data:", data);
+        
+        // Nominatim response structure is different
+        if (!data || !data.address) {
+          const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
           console.error(errorMsg);
           setError(errorMsg);
           return;
         }
-        console.log("Fetched city data:", data);
-        setCityName(data.city || data.locality || "");
-        setCountryName(data.countryName || "");  // ✅ Store countryName
-        setEmoji(convertToEmoji(data.countryCode || ""));
+        
+        const address = data.address;
+        // Extract city name from various possible fields in Nominatim response
+        const city = address.city || 
+                     address.town || 
+                     address.village || 
+                     address.municipality ||
+                     address.county ||
+                     address.state_district ||
+                     "";
+        
+        const countryName = address.country || "";
+        const countryCode = address.country_code?.toUpperCase() || "";
+        
+        if (!city && !countryName) {
+          const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
+          console.error(errorMsg);
+          setError(errorMsg);
+          return;
+        }
+        
+        setCityName(city);
+        setCountryName(countryName);
+        setEmoji(convertToEmoji(countryCode));
       } catch (error) {
         console.error(error);
         setError(`Failed to fetch city data: ${error.message}`);
@@ -111,12 +164,15 @@ function Form() {
       }
     }
     fetchCityData();
-  }, [coordKey]);  // ✅ Use coordKey instead of [lat, lng] to ensure proper change detection
+  }, [lat, lng]);  // ✅ Dependencies: lat and lng trigger effect when coordinates change
 
- 
+  function handleSubmit(e) {
+    e.preventDefault();
+    console.log(cityName, date, notes);
+  }
 
   return (
-    <form className={styles.form}>
+    <form className={styles.form} onSubmit={handleSubmit}>
       {isLoadingGeocoding && <p>Loading city data...</p>}
       {error && <p style={{ color: 'red', padding: '1rem', background: '#ffebee', borderRadius: '5px' }}>{error}</p>}  {/* ✅ Display error */}
       
@@ -155,7 +211,7 @@ function Form() {
       </div>
 
       <div className={styles.buttons}>
-        <Button type ="primary">Add</Button>
+        <Button type ="primary" onClick={handleSubmit}>Add</Button>
         <BackButton type="back" />
       </div>
     </form>
