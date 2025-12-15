@@ -47,7 +47,7 @@ function Map() {
       });
       // If user explicitly requested, navigate to form so data loads immediately
       if (geoRequestedRef.current) {
-        navigate(`form?lat=${geolocationPosition.lat}&lng=${geolocationPosition.lng}`);
+        navigate(`/app/form?lat=${geolocationPosition.lat}&lng=${geolocationPosition.lng}`);
       }
       geoRequestedRef.current = false; // reset flag after use
     }
@@ -137,7 +137,7 @@ function DetectClick() {
         // Double-check after normalization
         if (lng < -180 || lng > 180) {
           console.error(`Could not normalize longitude: ${lng}`);
-          alert(`Error: Invalid longitude ${latlng.lng}. Please try clicking again.`);
+          alert(`Error: Invalid longitude ${lng}. Please try clicking again.`);
           return;
         }
       }
