@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useEffect, useContext, useMemo } from 'react';
+import { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
 
 const DATABASE_URL = 'http://localhost:8000';
 
@@ -10,6 +10,7 @@ function CitiesProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCityId, setSelectedCityId] = useState(null);
   const [isLoadingCity, setIsLoadingCity] = useState(false);
+    
 
   useEffect(() => {
     async function fetchCities() {
@@ -32,9 +33,47 @@ function CitiesProvider({ children }) {
     fetchCities();
   }, []);
 
-  const getCity = (id) => {
+  // Moved createCity outside useEffect and use functional update
+  const createCity = useCallback(async (newCity) => {
+    try {
+      const res = await fetch(`${DATABASE_URL}/cities`, {
+        method: 'POST',
+        body: JSON.stringify(newCity),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) throw new Error('Failed to create city');
+      const data = await res.json(); // Parse JSON once
+      console.log('API Response:', data);
+      // Use functional update to avoid dependency on cities
+      setCities((c) => [...c, data]);
+      return data;
+    } catch (error) {
+      console.error('Error creating city:', error);
+      throw error;
+    }
+  }, []); // No dependencies needed since we use functional update
+
+  // Delete city function
+  const deleteCity = useCallback(async (id) => {
+    try {
+      const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete city');
+      // Use functional update to avoid dependency on cities
+      setCities((c) => c.filter((city) => city.id !== id));
+    } catch (error) {
+      console.error('Error deleting city:', error);
+      throw error;
+    }
+  }, []); // No dependencies needed since we use functional update
+
+  // Wrapped getCity in useCallback
+  const getCity = useCallback((id) => {
     return cities.find(city => city.id === parseInt(id));
-  };
+  }, [cities]);
 
   const handleCityClick = async (cityId) => {
     setSelectedCityId(cityId);
@@ -54,8 +93,10 @@ function CitiesProvider({ children }) {
       isLoadingCity,
       handleCityClick,
       setSelectedCityId,
+      createCity,
+      deleteCity, // Add deleteCity to context value
     }),
-    [cities, isLoading, selectedCityId, isLoadingCity]
+    [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity, deleteCity] // Include all dependencies
   );
 
   return (

@@ -20,12 +20,20 @@ function CityItem({ city }) {
   const { cityName, emoji, date, id, position } = city;
   const params = useParams();
   const currentCityId = params?.id;
-  const { selectedCityId, handleCityClick } = useCities();
+  const { selectedCityId, handleCityClick, deleteCity } = useCities();
   
   const isSelected = currentCityId === id.toString() || selectedCityId === id;
   
   const handleClick = () => {
     handleCityClick(id);
+  };
+
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+      deleteCity(id);
+    }
   };
    
   return (
@@ -38,7 +46,13 @@ function CityItem({ city }) {
         <span className={styles.emoji}>{emoji}</span>
         <h3 className={styles.name}>{cityName}</h3>
         <time className={styles.date}>{formatDate(date)}</time>
-        <button className={styles.deleteBtn}>&times;</button>
+        <button 
+          className={styles.deleteBtn} 
+          onClick={handleDelete}
+          aria-label="Delete city"
+        >
+          &times;
+        </button>
       </Link>
     </li>
   );

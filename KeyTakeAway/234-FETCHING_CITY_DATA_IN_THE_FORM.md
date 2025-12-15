@@ -68,11 +68,16 @@ import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
 import { convertToEmoji } from "../utils";
 ### 3.2 Define API Base URL
-const BASE_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client";**API Details:**
-- **Endpoint**: BigDataCloud Reverse Geocoding API
+const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
+
+**API Details:**
+- **Endpoint**: OpenStreetMap Nominatim Reverse Geocoding API
 - **Method**: GET
-- **Parameters**: `latitude` and `longitude`
-- **Returns**: City name, country name, country code, and other location data
+- **Parameters**: `lat`, `lon`, `format=json`, `addressdetails=1`, `accept-language=en`
+- **Headers**: Requires `User-Agent` header (e.g., 'WorldWiseApp/1.0')
+- **Returns**: Address object with city, country name, country code, and other location data
+- **Rate Limit**: 1 request per second (suitable for user interactions)
+- **Free**: No API key required, no IP bans
 
 ---
 
@@ -161,14 +166,50 @@ useEffect(function(){
     
     try {
       setIsLoadingGeocoding(true);
-      const res = await fetch(`${BASE_URL}?latitude=${lat}&longitude=${lng}`);
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      
+      // Use URLSearchParams for proper URL encoding
+      const params = new URLSearchParams({
+        lat: latNum.toString(),
+        lon: lngNum.toString(),
+        format: 'json',
+        addressdetails: '1',
+        'accept-language': 'en'
+      });
+      
+      // Nominatim requires a User-Agent header
+      const res = await fetch(`${BASE_URL}?${params.toString()}`, {
+        headers: {
+          'User-Agent': 'WorldWiseApp/1.0'
+        }
+      });
+      
       if (!res.ok) throw new Error("Failed to fetch city data");
       
       const data = await res.json();
-      setCityName(data.city || data.locality || "");
       
-      if (data.countryCode) {
-        setEmoji(convertToEmoji(data.countryCode));
+      // Nominatim response structure is different - data is in address object
+      if (!data || !data.address) {
+        setCityName("");
+        return;
+      }
+      
+      const address = data.address;
+      // Extract city name from various possible fields
+      const city = address.city || 
+                   address.town || 
+                   address.village || 
+                   address.municipality ||
+                   address.county ||
+                   address.state_district ||
+                   "";
+      
+      setCityName(city);
+      
+      if (address.country_code) {
+        // Nominatim returns lowercase country codes, convert to uppercase
+        setEmoji(convertToEmoji(address.country_code.toUpperCase()));
       }
     } catch (error) {
       console.error(error);
@@ -184,13 +225,16 @@ useEffect(function(){
 - Prevents unnecessary API calls
 
 **API Request:**
-- Constructs URL with latitude and longitude parameters
+- Constructs URL with `lat`, `lon`, `format`, `addressdetails`, and `accept-language` parameters
+- Uses `URLSearchParams` for proper URL encoding
+- Includes `User-Agent` header (required by Nominatim)
 - Uses `fetch()` for HTTP request
 - Checks response status with `res.ok`
 
 **Data Processing:**
 - Parses JSON response
-- Extracts city name (falls back to `locality` if `city` unavailable)
+- Extracts city name from `address` object (checks multiple fields: `city`, `town`, `village`, `municipality`, `county`, `state_district`)
+- Extracts country code from `address.country_code` (converts to uppercase as Nominatim returns lowercase)
 - Converts country code to emoji using utility function
 
 **Error Handling:**
@@ -204,10 +248,16 @@ useEffect(function(){
 
 ### 6.3 API Response Structureript
 {
-  city: "New York",
-  locality: "Manhattan",
-  countryName: "United States",
-  countryCode: "US",
+  address: {
+    city: "New York",
+    town: "Manhattan",  // Alternative if city not available
+    village: "...",     // Alternative if city/town not available
+    municipality: "...", // Alternative
+    county: "...",      // Alternative
+    state_district: "...", // Alternative
+    country: "United States",
+    country_code: "us"  // Lowercase, needs toUpperCase()
+  },
   // ... other fields
 }---
 
@@ -317,7 +367,8 @@ const [country, setCountry] = useState("");  // Never used**Solution:** Use the 
 ## STEP 9: Complete Implementation
 
 ### 9.1 Full Form Component Codeript
-// "https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=0&longitude=0"
+// Using OpenStreetMap Nominatim API - free, no API key required
+// "https://nominatim.openstreetmap.org/reverse?lat=0&lon=0&format=json"
 
 import { useState, useEffect } from "react";
 import Button from "./Button";
@@ -326,7 +377,7 @@ import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
 import { convertToEmoji } from "../utils";
 
-const BASE_URL = "https://api.bigdatacloud.net/data/reverse-geocode-client";
+const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
 
 // Helper function to format date to datetime-local format
 function formatDateTimeLocal(date) {
@@ -365,12 +416,49 @@ function Form() {
       if (!lat || !lng) return;
       try {
         setIsLoadingGeocoding(true);
-        const res = await fetch(`${BASE_URL}?latitude=${lat}&longitude=${lng}`);
+        const latNum = Number(lat);
+        const lngNum = Number(lng);
+        
+        // Use URLSearchParams for proper URL encoding
+        const params = new URLSearchParams({
+          lat: latNum.toString(),
+          lon: lngNum.toString(),
+          format: 'json',
+          addressdetails: '1',
+          'accept-language': 'en'
+        });
+        
+        // Nominatim requires a User-Agent header
+        const res = await fetch(`${BASE_URL}?${params.toString()}`, {
+          headers: {
+            'User-Agent': 'WorldWiseApp/1.0'
+          }
+        });
+        
         if (!res.ok) throw new Error("Failed to fetch city data");
+        
         const data = await res.json();
-        setCityName(data.city || data.locality || "");
-        if (data.countryCode) {
-          setEmoji(convertToEmoji(data.countryCode));
+        
+        // Nominatim response structure - data is in address object
+        if (!data || !data.address) {
+          setCityName("");
+          return;
+        }
+        
+        const address = data.address;
+        const city = address.city || 
+                     address.town || 
+                     address.village || 
+                     address.municipality ||
+                     address.county ||
+                     address.state_district ||
+                     "";
+        
+        setCityName(city);
+        
+        if (address.country_code) {
+          // Nominatim returns lowercase country codes, convert to uppercase
+          setEmoji(convertToEmoji(address.country_code.toUpperCase()));
         }
       } catch (error) {
         console.error(error);
@@ -447,12 +535,12 @@ useUrlPosition() extracts [lat, lng]
   ↓
 useEffect detects coordinates
   ↓
-API Call: reverse-geocode-client?latitude=40.7128&longitude=-74.0060
+API Call: reverse?lat=40.7128&lon=-74.0060&format=json&addressdetails=1
   ↓
-Response: { city: "New York", countryCode: "US", ... }
+Response: { address: { city: "New York", country: "United States", country_code: "us" }, ... }
   ↓
 setCityName("New York")
-setEmoji(convertToEmoji("US")) → "🇺🇸"
+setEmoji(convertToEmoji("US")) → "🇺🇸"  // Note: country_code converted to uppercase
   ↓
 Form displays: "New York 🇺🇸"
 ```
