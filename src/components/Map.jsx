@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useMemo, useEffect, useRef } from 'react';
 import styles from './Map.module.css';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
@@ -10,6 +10,7 @@ function Map() {
   const { isLoading: isLoadingPosition,
           position: geolocationPosition, 
           getPosition } = useGeolocation();
+  const geoRequestedRef = useRef(false); // track manual geo requests without causing re-renders
 
   const {cities} = useCities();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,22 +31,31 @@ function Map() {
 
   // Synchronize map position with geolocation data using React effects
   useEffect(() => {
-    if (geolocationPosition) {
+    // Seed URL params from geolocation when user asked OR no coords yet
+    if (geolocationPosition && (geoRequestedRef.current || (!maplat && !maplng))) {
       setSearchParams({
         lat: geolocationPosition.lat,
         lng: geolocationPosition.lng,
       });
+      geoRequestedRef.current = false; // reset flag after use
     }
-  }, [geolocationPosition, setSearchParams]);
+  }, [geolocationPosition, maplat, maplng, setSearchParams]);
+
+
 
   return (
     <div className={styles.mapContainer}>
-      {/* Conditionally render geolocation button based on whether position has been received */}
-      {!geolocationPosition && (
-        <Button type="position" onClick={getPosition}>
-          {isLoadingPosition ? "Loading..." : "Get Current Location"}
-        </Button>
-      )}
+      {/* Always allow re-triggering geolocation */}
+      <Button
+        type="position"
+        onClick={() => {
+          geoRequestedRef.current = true;
+          getPosition();
+        }}
+        disabled={isLoadingPosition}
+      >
+        {isLoadingPosition ? "Loading..." : "Get Current Location"}
+      </Button>
 
       <MapContainer className={styles.map} center={mapPosition} zoom={13} scrollWheelZoom={true}>
         <TileLayer
@@ -66,18 +76,68 @@ function Map() {
 }
 function ChangeCenter({position}) {
   const map = useMap();
-  map.setView(position, 6);
+  map.setView(position, 10);
   return null;
 }
 
 function DetectClick() {
   const navigate = useNavigate();
 
-  useMapEvents ({
+  useMapEvents({
     click: (e) => {
-      console.log(e);
-      navigate(`form?lat=${e.latlng.lat}&lng=${e.latlng.lng}`);
+      // ✅ Debug: Log the event to understand what's happening
+      console.log("Click event:", e);
+      console.log("latlng:", e.latlng);
+      
+      // ✅ Safely extract coordinates
+      const latlng = e.latlng;
+      
+      if (!latlng || typeof latlng.lat !== 'number' || typeof latlng.lng !== 'number') {
+        console.error("Invalid latlng in click event:", e);
+        alert("Error: Could not get valid coordinates from map click");
+        return;
+      }
+      
+      let lat = latlng.lat;
+      let lng = latlng.lng;
+      
+      // ✅ Validate and normalize latitude
+      if (lat < -90 || lat > 90) {
+        console.error(`Invalid latitude: ${lat}. Expected range: -90 to 90`);
+        alert(`Error: Invalid latitude ${lat}. Please try clicking again.`);
+        return;
+      }
+      
+      // ✅ Validate and normalize longitude (wrap around if needed)
+      if (lng < -180 || lng > 180) {
+        console.warn(`Longitude ${lng} is outside normal range. Attempting to normalize...`);
+        
+        // Normalize longitude to -180 to 180 range
+        while (lng > 180) {
+          lng -= 360;
+        }
+        while (lng < -180) {
+          lng += 360;
+        }
+        
+        console.log(`Normalized longitude to: ${lng}`);
+        
+        // Double-check after normalization
+        if (lng < -180 || lng > 180) {
+          console.error(`Could not normalize longitude: ${lng}`);
+          alert(`Error: Invalid longitude ${latlng.lng}. Please try clicking again.`);
+          return;
+        }
+      }
+      
+      // ✅ Round to reasonable precision (6 decimal places)
+      const roundedLat = Number(lat.toFixed(6));
+      const roundedLng = Number(lng.toFixed(6));
+      
+      console.log(`Navigating with coordinates: lat=${roundedLat}, lng=${roundedLng}`);
+      navigate(`form?lat=${roundedLat}&lng=${roundedLng}`);
     }
   });
 }
+
 export default Map;
