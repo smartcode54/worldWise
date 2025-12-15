@@ -13,18 +13,6 @@
       "id": 73930385
     },
     {
-      "cityName": "Madrid",
-      "country": "Spain",
-      "emoji": "🇪🇸",
-      "date": "2027-07-15T08:22:53.976Z",
-      "notes": "",
-      "position": {
-        "lat": 40.46635901755316,
-        "lng": -3.7133789062500004
-      },
-      "id": 17806751
-    },
-    {
       "cityName": "Berlin",
       "country": "Germany",
       "emoji": "🇩🇪",
@@ -35,30 +23,6 @@
         "lng": 13.376933665713324
       },
       "id": 98443197
-    },
-    {
-      "cityName": "Benafigos",
-      "countryName": "Spain",
-      "emoji": "🇪🇸",
-      "date": "2025-12-15T20:02",
-      "notes": "test post method",
-      "position": {
-        "lat": "40.291049",
-        "lng": "-0.205994"
-      },
-      "id": 98443198
-    },
-    {
-      "cityName": "Vilafamés",
-      "countryName": "Spain",
-      "emoji": "🇪🇸",
-      "date": "2025-12-15T20:04",
-      "notes": "test post methods",
-      "position": {
-        "lat": "40.108538",
-        "lng": "-0.101624"
-      },
-      "id": 98443201
     },
     {
       "cityName": "Hà Nội",
@@ -131,6 +95,42 @@
         "lng": 103.798828
       },
       "id": 98443209
+    },
+    {
+      "cityName": "Madrid",
+      "country": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2025-12-15T16:25:01.103Z",
+      "notes": "test",
+      "position": {
+        "lat": 40.42186,
+        "lng": -3.696899
+      },
+      "id": 98443210
+    },
+    {
+      "cityName": "Palencia",
+      "country": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2025-12-15T16:25:48.879Z",
+      "notes": "test duplicate country ",
+      "position": {
+        "lat": 42.008489,
+        "lng": -4.54834
+      },
+      "id": 98443211
+    },
+    {
+      "cityName": "Lisbon",
+      "country": "Portugal",
+      "emoji": "🇵🇹",
+      "date": "2025-12-15T16:26:56.681Z",
+      "notes": "test2",
+      "position": {
+        "lat": 38.725179,
+        "lng": -9.139059
+      },
+      "id": 98443212
     }
   ]
 }
