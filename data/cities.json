@@ -35,6 +35,102 @@
         "lng": 13.376933665713324
       },
       "id": 98443197
+    },
+    {
+      "cityName": "Benafigos",
+      "countryName": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2025-12-15T20:02",
+      "notes": "test post method",
+      "position": {
+        "lat": "40.291049",
+        "lng": "-0.205994"
+      },
+      "id": 98443198
+    },
+    {
+      "cityName": "Vilafamés",
+      "countryName": "Spain",
+      "emoji": "🇪🇸",
+      "date": "2025-12-15T20:04",
+      "notes": "test post methods",
+      "position": {
+        "lat": "40.108538",
+        "lng": "-0.101624"
+      },
+      "id": 98443201
+    },
+    {
+      "cityName": "Hà Nội",
+      "country": "Vietnam",
+      "emoji": "🇻🇳",
+      "date": "2025-12-15T13:15:43.388Z",
+      "notes": "test",
+      "position": {
+        "lat": 21.014009,
+        "lng": 105.853271
+      },
+      "id": 98443204
+    },
+    {
+      "cityName": "Bilma",
+      "country": "Niger",
+      "emoji": "🇳🇪",
+      "date": "2025-12-15T13:22:49.750Z",
+      "notes": "test",
+      "position": {
+        "lat": 20.303418,
+        "lng": 11.513672
+      },
+      "id": 98443205
+    },
+    {
+      "cityName": "Daw Hpar",
+      "country": "Myanmar",
+      "emoji": "🇲🇲",
+      "date": "2025-12-15T14:02:49.931Z",
+      "notes": "test",
+      "position": {
+        "lat": 19.37075,
+        "lng": 97.34436
+      },
+      "id": 98443206
+    },
+    {
+      "cityName": "Surgutsky District",
+      "country": "Russia",
+      "emoji": "🇷🇺",
+      "date": "2025-12-15T15:18:11.090Z",
+      "notes": "",
+      "position": {
+        "lat": 61.606396,
+        "lng": 73.476563
+      },
+      "id": 98443207
+    },
+    {
+      "cityName": "Toksun County",
+      "country": "China",
+      "emoji": "🇨🇳",
+      "date": "2025-12-15T15:27:04.730Z",
+      "notes": "",
+      "position": {
+        "lat": 41.640078,
+        "lng": 88.59375
+      },
+      "id": 98443208
+    },
+    {
+      "cityName": "Sant",
+      "country": "Mongolia",
+      "emoji": "🇲🇳",
+      "date": "2025-12-15T15:33:08.931Z",
+      "notes": "",
+      "position": {
+        "lat": 46.012224,
+        "lng": 103.798828
+      },
+      "id": 98443209
     }
   ]
 }

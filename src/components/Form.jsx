@@ -2,47 +2,33 @@
 // "https://nominatim.openstreetmap.org/reverse?lat=0&lon=0&format=json"
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Button from "./Button";
 import BackButton from "./BackButton";
+import Spinner from "./Spinner";
 import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
+import { useCities } from "../contexts/CitiesContext";
 import { convertToEmoji } from "../utils";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 // Using OpenStreetMap Nominatim - free, no API key required, no IP bans
 const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
 
-// Helper function to format date to datetime-local format
-function formatDateTimeLocal(date) {
-  if (!date) {
-    const now = new Date();
-    date = now;
-  }
-  
-  // If date is already a string in correct format, return it
-  if (typeof date === 'string' && date.includes('T')) {
-    return date;
-  }
-  
-  // Convert Date object to string
-  const d = date instanceof Date ? date : new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;  // ✅ Removed seconds
-}
-
 function Form() {  
   const [lat, lng] = useUrlPosition();
+  const navigate = useNavigate();
   
   const [cityName, setCityName] = useState("");
   const [countryName, setCountryName] = useState("");  // ✅ Add countryName state
   const [emoji, setEmoji] = useState("");
-  const [date, setDate] = useState(() => formatDateTimeLocal(new Date()));
+  const [date, setDate] = useState(new Date()); // DatePicker expects Date object
   const [notes, setNotes] = useState("");
   const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");  // ✅ Add error state
+  const { createCity } = useCities();
 
   useEffect(function(){
     async function fetchCityData() {
@@ -166,14 +152,48 @@ function Form() {
     fetchCityData();
   }, [lat, lng]);  // ✅ Dependencies: lat and lng trigger effect when coordinates change
 
-  function handleSubmit(e) {
+  
+  async function handleSubmit(e) {
     e.preventDefault();
-    console.log(cityName, date, notes);
+    if (!cityName || !date) return;
+    
+    // Convert date to ISO string if it's a Date object
+    const dateValue = date instanceof Date ? date.toISOString() : date;
+    
+    const newCity = {
+      cityName,
+      country: countryName, // Use 'country' to match data structure
+      emoji,
+      date: dateValue,
+      notes,
+      position: {
+        lat: Number(lat),
+        lng: Number(lng),
+      },  
+    };
+    
+    try {
+      setIsSubmitting(true);
+      setError("");
+      const createdCity = await createCity(newCity);
+      
+      // Navigate to the city detail page after successful creation
+      if (createdCity && createdCity.id) {
+        const latParam = createdCity.position?.lat || lat;
+        const lngParam = createdCity.position?.lng || lng;
+        navigate(`/app/cities/${createdCity.id}?lat=${latParam}&lng=${lngParam}`);
+      }
+    } catch (error) {
+      console.error('Failed to create city:', error);
+      setError(`Failed to add city: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <form className={styles.form} onSubmit={handleSubmit}>
-      {isLoadingGeocoding && <p>Loading city data...</p>}
+      {isLoadingGeocoding && <Spinner />}
       {error && <p style={{ color: 'red', padding: '1rem', background: '#ffebee', borderRadius: '5px' }}>{error}</p>}  {/* ✅ Display error */}
       
       <div className={styles.row}>
@@ -185,7 +205,7 @@ function Form() {
             const value = e.target.value;
             setCityName(value);
           }}
-          value={cityName && countryName ? `${cityName}, ${countryName}` : cityName}  // ✅ Display both separated by comma
+          value={isLoadingGeocoding ? "Loading..." : (cityName && countryName ? `${cityName}, ${countryName}` : cityName)}
           disabled={isLoadingGeocoding}
         />
         {emoji && <span className={styles.flag}>{emoji}</span>}
@@ -193,11 +213,18 @@ function Form() {
 
       <div className={styles.row}>
         <label htmlFor="date">When did you go to {cityName || "this city"}?</label>
-        <input
+        {/* <input
           id="date"
           type="datetime-local"
           onChange={(e) => setDate(e.target.value)}
           value={date}
+        /> */}
+        <DatePicker
+          id="date"
+          onChange={(selectedDate) => setDate(selectedDate || new Date())}
+          selected={date}
+          dateFormat="dd/MM/yyyy"
+          disabled={isLoadingGeocoding}
         />
       </div>
 
@@ -211,7 +238,9 @@ function Form() {
       </div>
 
       <div className={styles.buttons}>
-        <Button type ="primary" onClick={handleSubmit}>Add</Button>
+        <Button type ="primary" onClick={handleSubmit} disabled={isSubmitting || isLoadingGeocoding}>
+          {isSubmitting ? "Adding..." : "Add"}
+        </Button>
         <BackButton type="back" />
       </div>
     </form>
