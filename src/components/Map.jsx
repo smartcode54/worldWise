@@ -1,6 +1,6 @@
 import { useMemo, useEffect, useRef } from 'react';
 import styles from './Map.module.css';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { useCities } from '../contexts/CitiesContext';
 import useGeolocation from '../hooks/useGeolocaion';
@@ -14,32 +14,44 @@ function Map() {
 
   const {cities} = useCities();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const maplat = searchParams.get("lat");
   const maplng = searchParams.get("lng");
   
   //use memo to memoize the map position is right way to do it because it will not re-render the map position when the map lat and lng change
   const mapPosition = useMemo(() => {
-    // Priority: URL params > geolocation > default
+    // Priority: URL params > default (on cities page) > geolocation (only on form page)
     if (maplat && maplng) {
       return [Number(maplat), Number(maplng)];
+    }
+    // On cities page without URL params, use default center
+    // On form page, use geolocation if available, otherwise default
+    if (pathname === "/app/cities") {
+      return [40, 0]; // Default center for cities page
     }
     if (geolocationPosition) {
       return [geolocationPosition.lat, geolocationPosition.lng];
     }
     return [40, 0];
-  }, [maplat, maplng, geolocationPosition]);
+  }, [maplat, maplng, geolocationPosition, pathname]);
 
   // Synchronize map position with geolocation data using React effects
   useEffect(() => {
     // Seed URL params from geolocation when user asked OR no coords yet
-    if (geolocationPosition && (geoRequestedRef.current || (!maplat && !maplng))) {
+    const onFormPage = pathname === "/app/form";
+    if (onFormPage && geolocationPosition && (geoRequestedRef.current || (!maplat && !maplng))) {
       setSearchParams({
         lat: geolocationPosition.lat,
         lng: geolocationPosition.lng,
       });
+      // If user explicitly requested, navigate to form so data loads immediately
+      if (geoRequestedRef.current) {
+        navigate(`form?lat=${geolocationPosition.lat}&lng=${geolocationPosition.lng}`);
+      }
       geoRequestedRef.current = false; // reset flag after use
     }
-  }, [geolocationPosition, maplat, maplng, setSearchParams]);
+  }, [geolocationPosition, maplat, maplng, pathname, setSearchParams, navigate]);
 
 
 

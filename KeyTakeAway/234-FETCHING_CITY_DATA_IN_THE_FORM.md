@@ -464,13 +464,171 @@ Form displays: "New York 🇺🇸"
 - **convertToEmoji Utility**: Converts country codes to flags
 - **formatDateTimeLocal**: Ensures proper date format
 
+### 10.3.5 Fix: Form Not Updating When Coordinates Change
+
+**Problem:** When lat/lng values change in the URL (e.g., clicking different locations on the map), the form's `useEffect` might not detect the change because React's dependency comparison for numbers can fail with floating-point values or when values transition between `null` and numbers.
+
+**Solution:** Use a coordinate key string instead of individual lat/lng values in the dependency array:
+
+```jsx
+// Form.jsx
+function Form() {
+  const [lat, lng] = useUrlPosition();
+  
+  // Create a unique key from coordinates to ensure useEffect triggers on any change
+  const coordKey = lat !== null && lng !== null ? `${lat},${lng}` : null;
+
+  useEffect(function(){
+    async function fetchCityData() {
+      if (!lat || !lng) {
+        // Clear form if no coordinates
+        setCityName("");
+        setCountryName("");
+        setEmoji("");
+        setError("");
+        return;
+      }
+      
+      // Reset form state when coordinates change
+      setCityName("");
+      setCountryName("");
+      setEmoji("");
+      setError("");
+      
+      // ... validation and API call ...
+    }
+    fetchCityData();
+  }, [coordKey]); // ✅ Use coordKey instead of [lat, lng]
+}
+```
+
+**Why This Works:**
+- String comparison is more reliable than number comparison for detecting changes
+- Any coordinate change produces a new string, ensuring React detects the update
+- Handles `null` values correctly (returns `null` when coordinates are missing)
+- Guarantees the effect runs whenever coordinates change, even slightly
+
+**Alternative Solution:** Keep `useUrlPosition` returning strings instead of numbers:
+```jsx
+// useUrlPosition.js
+function useUrlPosition() {
+  const [searchParams] = useSearchParams();
+  const lat = searchParams.get("lat");
+  const lng = searchParams.get("lng");
+  return [lat, lng]; // Return strings, convert to numbers when needed
+}
+```
+
 ### 10.4 Preventing Geolocation from Overwriting Map Clicks
-- Only seed URL params from geolocation when there are no coords **or** when the user explicitly clicks “Get Current Location”.
-- Keep the button always visible so it can be re-used.
-- Use a ref (not state) for the “geo requested” flag to avoid setState in `useEffect`:
-  - `const geoRequestedRef = useRef(false);`
-  - In effect: `if (geolocationPosition && (geoRequestedRef.current || (!maplat && !maplng))) { setSearchParams(...); geoRequestedRef.current = false; }`
-  - Button onClick: `geoRequestedRef.current = true; getPosition();`
+
+**Problem:** When clicking "Get Current Location" and then clicking another location on the map, the geolocation position would overwrite the clicked coordinates, preventing the form from updating.
+
+**Solution:**
+1. Use a ref (not state) to track when geolocation is explicitly requested:
+   ```jsx
+   const geoRequestedRef = useRef(false);
+   ```
+
+2. Only seed URL params from geolocation when:
+   - User explicitly clicks "Get Current Location" button, OR
+   - There are no coordinates in URL yet (initial state)
+   - AND only on the form page
+
+3. Keep the "Get Current Location" button always visible so users can re-trigger geolocation anytime.
+
+4. When user explicitly requests geolocation, also navigate to form page immediately:
+   ```jsx
+   useEffect(() => {
+     const onFormPage = pathname === "/app/form";
+     if (onFormPage && geolocationPosition && (geoRequestedRef.current || (!maplat && !maplng))) {
+       setSearchParams({
+         lat: geolocationPosition.lat,
+         lng: geolocationPosition.lng,
+       });
+       // If user explicitly requested, navigate to form so data loads immediately
+       if (geoRequestedRef.current) {
+         navigate(`form?lat=${geolocationPosition.lat}&lng=${geolocationPosition.lng}`);
+       }
+       geoRequestedRef.current = false; // reset flag after use
+     }
+   }, [geolocationPosition, maplat, maplng, pathname, setSearchParams, navigate]);
+   ```
+
+5. Button onClick handler:
+   ```jsx
+   <Button
+     type="position"
+     onClick={() => {
+       geoRequestedRef.current = true;
+       getPosition();
+     }}
+     disabled={isLoadingPosition}
+   >
+     {isLoadingPosition ? "Loading..." : "Get Current Location"}
+   </Button>
+   ```
+
+**Key Points:**
+- Using `useRef` instead of `useState` prevents React lint warnings about setState in effects
+- The ref flag ensures geolocation only overwrites URL params when explicitly requested
+- Map clicks now properly update the form without being overwritten
+
+### 10.5 Resetting Map Center When Clicking Back Button
+
+**Problem:** When clicking the Back button from the form, the URL params (`?lat=...&lng=...`) would persist, keeping the map centered on the previous location instead of resetting to the default center `[40, 0]`.
+
+**Solution:**
+
+1. **BackButton Component** - Clear URL params before navigating:
+   ```jsx
+   import { useNavigate, useSearchParams } from 'react-router-dom';
+
+   export default function BackButton({ type = "back" }) {
+     const navigate = useNavigate();
+     const [, setSearchParams] = useSearchParams();
+     
+     const handleClick = (e) => {
+       e.preventDefault();
+       e.stopPropagation();
+       // Clear all URL params first to reset map to default center [40, 0]
+       setSearchParams({}, { replace: true });
+       // Then navigate to cities page
+       navigate('/app/cities', { replace: true });
+     };
+     // ...
+   }
+   ```
+
+2. **Map Component** - Update mapPosition logic to prioritize default center on cities page:
+   ```jsx
+   const mapPosition = useMemo(() => {
+     // Priority: URL params > default (on cities page) > geolocation (only on form page)
+     if (maplat && maplng) {
+       return [Number(maplat), Number(maplng)];
+     }
+     // On cities page without URL params, use default center
+     // On form page, use geolocation if available, otherwise default
+     if (pathname === "/app/cities") {
+       return [40, 0]; // Default center for cities page
+     }
+     if (geolocationPosition) {
+       return [geolocationPosition.lat, geolocationPosition.lng];
+     }
+     return [40, 0];
+   }, [maplat, maplng, geolocationPosition, pathname]);
+   ```
+
+**Why This Works:**
+- When Back button is clicked, URL params are cleared first
+- Navigation goes to `/app/cities` without any query parameters
+- Map component detects it's on cities page with no URL params
+- Falls back to default center `[40, 0]` instead of using geolocation position
+- Map resets to default view
+
+**Key Points:**
+- Always clear search params before navigating back to prevent stale coordinates
+- Check `pathname` in mapPosition logic to handle different pages appropriately
+- On cities page, prioritize default center over geolocation to ensure clean reset
 
 ---
 
@@ -483,6 +641,9 @@ This guide covered:
 - ✅ Formatting dates for datetime-local inputs
 - ✅ Handling loading and error states
 - ✅ Auto-populating form fields with API data
+- ✅ Preventing geolocation from overwriting map clicks
+- ✅ Resetting map center when navigating back
+- ✅ Using coordinate keys to ensure form updates when coordinates change
 - ✅ Common errors and their solutions
 
-The form now automatically fetches and displays city information when users click on the map, providing a seamless user experience.
+The form now automatically fetches and displays city information when users click on the map, providing a seamless user experience. The map properly handles geolocation requests, map clicks, and navigation, ensuring data always updates correctly and the map resets to default center when needed.
