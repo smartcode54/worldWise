@@ -11,8 +11,9 @@ This guide documents all the changes made to implement the "Create New City" fun
 6. [Form Submission Flow](#form-submission-flow)
 7. [Error Handling](#error-handling)
 8. [Navigation After Creation](#navigation-after-creation)
-9. [Map Component Enhancements](#map-component-enhancements)
-10. [Code Examples](#code-examples)
+9. [Deleting Cities](#deleting-cities)
+10. [Map Component Enhancements](#map-component-enhancements)
+11. [Code Examples](#code-examples)
 
 ---
 
@@ -480,10 +481,389 @@ function Form() {
 - Provide visual feedback
 - Navigate to relevant page after success
 
+### 7. **Delete Functionality**
+- Use `useCallback` for stable function reference
+- Functional updates prevent stale state issues
+- Confirmation dialogs prevent accidental deletions
+- Proper event handling prevents navigation
+
+---
+
+## Complete Step-by-Step Implementation Guide
+
+### Phase 1: Setting Up Context (CitiesContext)
+
+#### Step 1.1: Add createCity Function
+
+**File**: `src/contexts/CitiesContext.jsx`
+
+```jsx
+// 1. Import useCallback
+import { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
+
+// 2. Create createCity function OUTSIDE useEffect
+const createCity = useCallback(async (newCity) => {
+  try {
+    // 3. Make POST request to API
+    const res = await fetch(`${DATABASE_URL}/cities`, {
+      method: 'POST',
+      body: JSON.stringify(newCity),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    // 4. Check if request was successful
+    if (!res.ok) throw new Error('Failed to create city');
+    
+    // 5. Parse response (ONCE - don't call res.json() twice!)
+    const data = await res.json();
+    
+    // 6. Update state using functional update
+    setCities((c) => [...c, data]);
+    
+    // 7. Return created city (includes ID from server)
+    return data;
+  } catch (error) {
+    console.error('Error creating city:', error);
+    throw error;
+  }
+}, []); // Empty deps - uses functional update
+
+// 8. Add createCity to context value
+const value = useMemo(
+  () => ({
+    cities,
+    isLoading,
+    getCity,
+    selectedCityId,
+    isLoadingCity,
+    handleCityClick,
+    setSelectedCityId,
+    createCity, // ✅ Add this
+  }),
+  [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity]
+);
+```
+
+#### Step 1.2: Add deleteCity Function
+
+```jsx
+// 1. Create deleteCity function
+const deleteCity = useCallback(async (id) => {
+  try {
+    // 2. Make DELETE request to API
+    const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
+      method: 'DELETE',
+    });
+    
+    // 3. Check if request was successful
+    if (!res.ok) throw new Error('Failed to delete city');
+    
+    // 4. Update state using functional update
+    setCities((c) => c.filter((city) => city.id !== id));
+  } catch (error) {
+    console.error('Error deleting city:', error);
+    throw error;
+  }
+}, []); // Empty deps - uses functional update
+
+// 5. Add deleteCity to context value
+const value = useMemo(
+  () => ({
+    // ... other values
+    createCity,
+    deleteCity, // ✅ Add this
+  }),
+  [/* ... dependencies including deleteCity */]
+);
+```
+
+---
+
+### Phase 2: Implementing Form Component
+
+#### Step 2.1: Add Required Imports
+
+**File**: `src/components/Form.jsx`
+
+```jsx
+// 1. Add navigation hook
+import { useNavigate } from "react-router-dom";
+
+// 2. Add context hook
+import { useCities } from "../contexts/CitiesContext";
+
+// 3. Add DatePicker
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+```
+
+#### Step 2.2: Initialize Hooks and State
+
+```jsx
+function Form() {
+  // 1. Get coordinates from URL
+  const [lat, lng] = useUrlPosition();
+  
+  // 2. Initialize navigation
+  const navigate = useNavigate();
+  
+  // 3. Get createCity from context
+  const { createCity } = useCities();
+  
+  // 4. Form state
+  const [cityName, setCityName] = useState("");
+  const [countryName, setCountryName] = useState("");
+  const [emoji, setEmoji] = useState("");
+  const [date, setDate] = useState(new Date()); // ✅ Date object for DatePicker
+  const [notes, setNotes] = useState("");
+  
+  // 5. UI state
+  const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // ✅ New state
+  const [error, setError] = useState("");
+}
+```
+
+#### Step 2.3: Implement Form Submission Handler
+
+```jsx
+async function handleSubmit(e) {
+  // Step 1: Prevent default form submission
+  e.preventDefault();
+  
+  // Step 2: Basic validation
+  if (!cityName || !date) return;
+  
+  // Step 3: Convert date to ISO string (API expects string)
+  const dateValue = date instanceof Date ? date.toISOString() : date;
+  
+  // Step 4: Prepare city object matching API structure
+  const newCity = {
+    cityName,                    // String
+    country: countryName,        // ✅ Note: 'country' not 'countryName'
+    emoji,                       // String (emoji)
+    date: dateValue,             // ISO string
+    notes,                       // String
+    position: {
+      lat: Number(lat),          // Convert to number
+      lng: Number(lng),          // Convert to number
+    },
+  };
+  
+  // Step 5: Submit with loading state
+  try {
+    setIsSubmitting(true);       // Show loading
+    setError("");                // Clear previous errors
+    
+    // Step 6: Call createCity and wait for response
+    const createdCity = await createCity(newCity);
+    
+    // Step 7: Navigate to city detail page after success
+    if (createdCity && createdCity.id) {
+      const latParam = createdCity.position?.lat || lat;
+      const lngParam = createdCity.position?.lng || lng;
+      navigate(`/app/cities/${createdCity.id}?lat=${latParam}&lng=${lngParam}`);
+    }
+  } catch (error) {
+    // Step 8: Handle errors
+    console.error('Failed to create city:', error);
+    setError(`Failed to add city: ${error.message}`);
+  } finally {
+    // Step 9: Reset loading state (always runs)
+    setIsSubmitting(false);
+  }
+}
+```
+
+#### Step 2.4: Update Form JSX
+
+```jsx
+return (
+  <form className={styles.form} onSubmit={handleSubmit}>
+    {/* Show loading spinner */}
+    {isLoadingGeocoding && <Spinner />}
+    
+    {/* Display errors */}
+    {error && <p style={{ color: 'red', padding: '1rem', background: '#ffebee', borderRadius: '5px' }}>{error}</p>}
+    
+    {/* City name input */}
+    <div className={styles.row}>
+      <label htmlFor="cityName">City name</label>
+      <input
+        id="cityName"
+        onChange={(e) => setCityName(e.target.value)}
+        value={isLoadingGeocoding ? "Loading..." : (cityName && countryName ? `${cityName}, ${countryName}` : cityName)}
+        disabled={isLoadingGeocoding}
+      />
+      {emoji && <span className={styles.flag}>{emoji}</span>}
+    </div>
+
+    {/* Date picker */}
+    <div className={styles.row}>
+      <label htmlFor="date">When did you go to {cityName || "this city"}?</label>
+      <DatePicker
+        id="date"
+        onChange={(selectedDate) => setDate(selectedDate || new Date())}
+        selected={date}
+        dateFormat="dd/MM/yyyy"
+        disabled={isLoadingGeocoding}
+      />
+    </div>
+
+    {/* Notes textarea */}
+    <div className={styles.row}>
+      <label htmlFor="notes">Notes about your trip to {cityName || "this city"}</label>
+      <textarea
+        id="notes"
+        onChange={(e) => setNotes(e.target.value)}
+        value={notes}
+      />
+    </div>
+
+    {/* Submit button with loading state */}
+    <div className={styles.buttons}>
+      <Button 
+        type="primary" 
+        onClick={handleSubmit} 
+        disabled={isSubmitting || isLoadingGeocoding}
+      >
+        {isSubmitting ? "Adding..." : "Add"}
+      </Button>
+      <BackButton type="back" />
+    </div>
+  </form>
+);
+```
+
+---
+
+### Phase 3: Implementing Delete Functionality
+
+#### Step 3.1: Update CityItem Component
+
+**File**: `src/components/CityItem.jsx`
+
+```jsx
+// 1. Import deleteCity from context
+import { useCities } from '../contexts/CitiesContext';
+
+function CityItem({ city }) {
+  const { cityName, emoji, date, id, position } = city;
+  const { selectedCityId, handleCityClick, deleteCity } = useCities();
+  
+  // 2. Create delete handler
+  const handleDelete = (e) => {
+    // Prevent navigation (button is inside Link)
+    e.preventDefault();
+    
+    // Stop event propagation (prevent Link click)
+    e.stopPropagation();
+    
+    // Show confirmation dialog
+    if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+      // Call deleteCity if user confirms
+      deleteCity(id);
+    }
+  };
+  
+  // 3. Add delete button to JSX
+  return (
+    <li>
+      <Link to={`/app/cities/${id}...`}>
+        <span className={styles.emoji}>{emoji}</span>
+        <h3 className={styles.name}>{cityName}</h3>
+        <time className={styles.date}>{formatDate(date)}</time>
+        
+        {/* Delete button */}
+        <button 
+          className={styles.deleteBtn} 
+          onClick={handleDelete}
+          aria-label="Delete city"
+        >
+          &times;
+        </button>
+      </Link>
+    </li>
+  );
+}
+```
+
+---
+
+### Phase 4: Complete Data Flow
+
+#### Create City Flow:
+
+```
+1. User clicks on map
+   ↓
+2. Navigate to /app/form?lat=X&lng=Y
+   ↓
+3. Form component mounts
+   ↓
+4. useEffect detects lat/lng in URL
+   ↓
+5. Fetch city data from Nominatim API
+   ↓
+6. Auto-fill form fields (cityName, countryName, emoji)
+   ↓
+7. User fills date and notes
+   ↓
+8. User clicks "Add" button
+   ↓
+9. handleSubmit() executes
+   ↓
+10. Validate form data
+    ↓
+11. Call createCity(newCity)
+    ↓
+12. POST request to http://localhost:8000/cities
+    ↓
+13. Server returns created city (with ID)
+    ↓
+14. Context updates cities state
+    ↓
+15. Navigate to /app/cities/{id}?lat=X&lng=Y
+    ↓
+16. City appears in CityList, CountryList, and Map
+```
+
+#### Delete City Flow:
+
+```
+1. User clicks delete button (×) on a city item
+   ↓
+2. handleDelete() executes
+   ↓
+3. e.preventDefault() prevents Link navigation
+   ↓
+4. e.stopPropagation() stops event bubbling
+   ↓
+5. window.confirm() shows confirmation dialog
+   ↓
+6. If user clicks "OK":
+   ↓
+7. deleteCity(id) is called
+   ↓
+8. DELETE request sent to http://localhost:8000/cities/{id}
+   ↓
+9. Server deletes city from database
+   ↓
+10. Context updates: setCities((c) => c.filter((city) => city.id !== id))
+    ↓
+11. City removed from:
+    - CityList (disappears from list)
+    - CountryList (country removed if it was the last city)
+    - Map (marker disappears)
+```
+
 ---
 
 ## Testing Checklist
 
+### Create City:
 - [ ] Form validates required fields (cityName, date)
 - [ ] Date picker displays and updates correctly
 - [ ] City is created successfully via API
@@ -494,6 +874,17 @@ function Form() {
 - [ ] New city appears in CountryList
 - [ ] Map shows new city marker
 - [ ] Form resets when coordinates change
+
+### Delete City:
+- [ ] Delete button appears on each city item
+- [ ] Clicking delete shows confirmation dialog
+- [ ] Canceling confirmation does nothing
+- [ ] Confirming deletion removes city from API
+- [ ] City disappears from CityList after deletion
+- [ ] City marker disappears from Map after deletion
+- [ ] Country removed from CountryList if it was the last city
+- [ ] Error handling works if API fails
+- [ ] No navigation occurs when clicking delete button
 
 ---
 
@@ -532,6 +923,421 @@ const newCity = {
   country: countryName,  // Map countryName → country
 };
 ```
+
+---
+
+## Deleting Cities
+
+### Overview
+
+The delete functionality allows users to remove cities from their list. This feature is implemented in both the `CitiesContext` (for API integration) and the `CityItem` component (for UI interaction).
+
+---
+
+### 1. Context Implementation (CitiesContext)
+
+#### Step 1: Create deleteCity Function
+
+**File**: `src/contexts/CitiesContext.jsx`
+
+```jsx
+// Delete city function
+const deleteCity = useCallback(async (id) => {
+  try {
+    // Step 1: Make DELETE request to API
+    const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
+      method: 'DELETE',
+    });
+    
+    // Step 2: Check if request was successful
+    if (!res.ok) throw new Error('Failed to delete city');
+    
+    // Step 3: Update state using functional update
+    // Filter out the deleted city from the array
+    setCities((c) => c.filter((city) => city.id !== id));
+  } catch (error) {
+    console.error('Error deleting city:', error);
+    throw error; // Re-throw so component can handle it
+  }
+}, []); // Empty deps - uses functional update
+```
+
+**Key Points:**
+- Uses `useCallback` to prevent unnecessary re-renders
+- Functional update `setCities((c) => c.filter(...))` avoids dependency on `cities`
+- Throws error so component can handle it
+- No return value needed (city is removed from state)
+
+#### Step 2: Add deleteCity to Context Value
+
+```jsx
+const value = useMemo(
+  () => ({
+    cities,
+    isLoading,
+    getCity,
+    selectedCityId,
+    isLoadingCity,
+    handleCityClick,
+    setSelectedCityId,
+    createCity,
+    deleteCity, // ✅ Add deleteCity to context value
+  }),
+  [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity, deleteCity]
+);
+```
+
+---
+
+### 2. Component Implementation (CityItem)
+
+#### Step 1: Import deleteCity from Context
+
+**File**: `src/components/CityItem.jsx`
+
+```jsx
+import { useCities } from '../contexts/CitiesContext';
+
+function CityItem({ city }) {
+  // Extract deleteCity from context
+  const { selectedCityId, handleCityClick, deleteCity } = useCities();
+  
+  // ... rest of component
+}
+```
+
+#### Step 2: Create Delete Handler
+
+```jsx
+const handleDelete = (e) => {
+  // Step 1: Prevent navigation (button is inside Link)
+  e.preventDefault();
+  
+  // Step 2: Stop event propagation (prevent Link click)
+  e.stopPropagation();
+  
+  // Step 3: Show confirmation dialog
+  if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+    // Step 4: Call deleteCity if user confirms
+    deleteCity(id);
+  }
+};
+```
+
+**Why preventDefault and stopPropagation?**
+- Button is inside a `<Link>` component
+- Without `preventDefault()`, clicking delete would navigate to city detail page
+- Without `stopPropagation()`, the Link's onClick would also fire
+- Both prevent unwanted navigation
+
+#### Step 3: Add Delete Button to JSX
+
+```jsx
+return (
+  <li>
+    <Link 
+      className={`${styles.cityItem} ${isSelected ? styles.cityItemActive : ''}`}
+      to={`/app/cities/${id}...`}
+      onClick={handleClick}
+    >
+      <span className={styles.emoji}>{emoji}</span>
+      <h3 className={styles.name}>{cityName}</h3>
+      <time className={styles.date}>{formatDate(date)}</time>
+      
+      {/* Delete button */}
+      <button 
+        className={styles.deleteBtn} 
+        onClick={handleDelete}
+        aria-label="Delete city"
+      >
+        &times;
+      </button>
+    </Link>
+  </li>
+);
+```
+
+**Button Features:**
+- `&times;` - X symbol for delete
+- `aria-label` - Accessibility label
+- `onClick={handleDelete}` - Calls delete handler
+- Styled with CSS module class
+
+---
+
+### 3. Complete Implementation Flow
+
+#### User Flow:
+
+```
+1. User clicks delete button (×) on a city item
+   ↓
+2. handleDelete() executes
+   ↓
+3. e.preventDefault() prevents Link navigation
+   ↓
+4. e.stopPropagation() stops event bubbling
+   ↓
+5. window.confirm() shows confirmation dialog
+   ↓
+6. If user clicks "OK":
+   ↓
+7. deleteCity(id) is called
+   ↓
+8. DELETE request sent to http://localhost:8000/cities/{id}
+   ↓
+9. Server deletes city from database
+   ↓
+10. Context updates: setCities((c) => c.filter((city) => city.id !== id))
+    ↓
+11. City removed from:
+    - CityList (disappears from list)
+    - CountryList (country removed if it was the last city)
+    - Map (marker disappears)
+```
+
+#### State Update Flow:
+
+```jsx
+// Before deletion
+cities: [city1, city2, city3, city4]
+
+// User deletes city2 (id: 2)
+deleteCity(2)
+
+// After deletion
+cities: [city1, city3, city4]  // ✅ city2 removed
+
+// Components automatically update:
+// - CityList: Shows 3 cities instead of 4
+// - CountryList: Updates if country was unique to deleted city
+// - Map: Removes marker for deleted city
+```
+
+---
+
+### 4. Error Handling
+
+#### Context Level:
+
+```jsx
+const deleteCity = useCallback(async (id) => {
+  try {
+    const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete city');
+    
+    setCities((c) => c.filter((city) => city.id !== id));
+  } catch (error) {
+    console.error('Error deleting city:', error);
+    throw error; // Component can catch and handle
+  }
+}, []);
+```
+
+#### Component Level (Optional Enhancement):
+
+You can add error handling in CityItem if needed:
+
+```jsx
+const handleDelete = async (e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  
+  if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+    try {
+      await deleteCity(id);
+      // Optional: Show success message
+    } catch (error) {
+      // Optional: Show error message to user
+      alert(`Failed to delete city: ${error.message}`);
+    }
+  }
+};
+```
+
+---
+
+### 5. Key Implementation Details
+
+#### Why useCallback?
+
+```jsx
+const deleteCity = useCallback(async (id) => {
+  // ...
+}, []); // Empty dependency array
+```
+
+**Benefits:**
+- Function reference stays stable
+- Prevents unnecessary re-renders of components using it
+- Better performance
+
+#### Why Functional Update?
+
+```jsx
+setCities((c) => c.filter((city) => city.id !== id));
+```
+
+**Benefits:**
+- No dependency on `cities` in useCallback
+- Always uses latest state
+- Avoids stale closure issues
+- Cleaner code
+
+#### Why Confirmation Dialog?
+
+```jsx
+if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+  deleteCity(id);
+}
+```
+
+**Benefits:**
+- Prevents accidental deletions
+- Better user experience
+- Standard UX pattern
+
+---
+
+### 6. Complete Code Example
+
+#### CitiesContext.jsx:
+
+```jsx
+// Delete city function
+const deleteCity = useCallback(async (id) => {
+  try {
+    const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete city');
+    
+    // Use functional update to avoid dependency on cities
+    setCities((c) => c.filter((city) => city.id !== id));
+  } catch (error) {
+    console.error('Error deleting city:', error);
+    throw error;
+  }
+}, []);
+
+// Add to context value
+const value = useMemo(
+  () => ({
+    // ... other values
+    deleteCity,
+  }),
+  [/* ... dependencies including deleteCity */]
+);
+```
+
+#### CityItem.jsx:
+
+```jsx
+function CityItem({ city }) {
+  const { cityName, emoji, date, id, position } = city;
+  const { selectedCityId, handleCityClick, deleteCity } = useCities();
+  
+  const handleDelete = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (window.confirm(`Are you sure you want to delete ${cityName}?`)) {
+      deleteCity(id);
+    }
+  };
+  
+  return (
+    <li>
+      <Link to={`/app/cities/${id}...`}>
+        {/* City content */}
+        <button 
+          className={styles.deleteBtn} 
+          onClick={handleDelete}
+          aria-label="Delete city"
+        >
+          &times;
+        </button>
+      </Link>
+    </li>
+  );
+}
+```
+
+---
+
+### 7. Testing Checklist
+
+- [ ] Delete button appears on each city item
+- [ ] Clicking delete shows confirmation dialog
+- [ ] Canceling confirmation does nothing
+- [ ] Confirming deletion removes city from API
+- [ ] City disappears from CityList after deletion
+- [ ] City marker disappears from Map after deletion
+- [ ] Country removed from CountryList if it was the last city
+- [ ] Error handling works if API fails
+- [ ] No navigation occurs when clicking delete button
+
+---
+
+### 8. Common Issues & Solutions
+
+#### Issue 1: Delete Button Navigates to City Page
+
+**Problem**: Clicking delete button navigates to city detail page
+
+**Solution**: Add `e.preventDefault()` and `e.stopPropagation()`
+
+```jsx
+const handleDelete = (e) => {
+  e.preventDefault();      // ✅ Prevents default Link behavior
+  e.stopPropagation();     // ✅ Stops event bubbling
+  // ... rest of handler
+};
+```
+
+#### Issue 2: City Not Removed from UI
+
+**Problem**: City deleted from API but still shows in list
+
+**Solution**: Ensure functional update is used correctly
+
+```jsx
+// ✅ Correct
+setCities((c) => c.filter((city) => city.id !== id));
+
+// ❌ Wrong (might use stale state)
+setCities(cities.filter((city) => city.id !== id));
+```
+
+#### Issue 3: Multiple Cities Deleted
+
+**Problem**: Clicking delete removes multiple cities
+
+**Solution**: Ensure ID comparison is correct
+
+```jsx
+// ✅ Correct - strict comparison
+setCities((c) => c.filter((city) => city.id !== id));
+
+// ❌ Wrong - might match multiple cities
+setCities((c) => c.filter((city) => city.id != id));
+```
+
+---
+
+### 9. Summary
+
+The delete functionality provides:
+
+✅ **API Integration**: DELETE request to remove city from database  
+✅ **State Management**: Automatic UI updates via context  
+✅ **User Confirmation**: Prevents accidental deletions  
+✅ **Event Handling**: Proper prevention of unwanted navigation  
+✅ **Error Handling**: Graceful error management  
+✅ **Accessibility**: Proper ARIA labels  
+
+The implementation follows React best practices with proper event handling, state management, and user experience considerations.
 
 ---
 
@@ -802,12 +1608,12 @@ function Map() {
 
 ## Related Files
 
-- `src/components/Form.jsx` - Main form component
-- `src/contexts/CitiesContext.jsx` - Context with createCity function
-- `src/components/CityItem.jsx` - Displays created cities
+- `src/components/Form.jsx` - Main form component with create functionality
+- `src/contexts/CitiesContext.jsx` - Context with createCity and deleteCity functions
+- `src/components/CityItem.jsx` - Displays cities with delete button
 - `src/components/CityList.jsx` - Lists all cities
 - `src/components/CountryList.jsx` - Lists countries from cities
-- `src/components/Map.jsx` - Shows city markers
+- `src/components/Map.jsx` - Shows city markers with selection highlighting
 
 ---
 
@@ -831,6 +1637,13 @@ The Form component now provides a complete city creation experience:
 - ✅ Navigates to city detail page after creation
 - ✅ Updates all related components automatically
 
+### Delete Functionality:
+- ✅ DELETE API integration in CitiesContext
+- ✅ Delete button in CityItem component
+- ✅ User confirmation before deletion
+- ✅ Automatic UI updates after deletion
+- ✅ Proper event handling to prevent navigation
+
 ### Map Component Enhancements:
 - ✅ Selected city markers highlighted in red
 - ✅ Dynamic zoom levels based on context
@@ -838,5 +1651,5 @@ The Form component now provides a complete city creation experience:
 - ✅ Smooth transitions between views
 - ✅ Visual feedback for user interactions
 
-The implementation follows React best practices with proper error handling, loading states, and user feedback throughout the creation flow. The map component provides intuitive visual feedback and automatic adjustments for optimal user experience.
+The implementation follows React best practices with proper error handling, loading states, and user feedback throughout the creation and deletion flow. The map component provides intuitive visual feedback and automatic adjustments for optimal user experience.
 

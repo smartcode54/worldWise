@@ -131,6 +131,54 @@
         "lng": -9.139059
       },
       "id": 98443212
+    },
+    {
+      "cityName": "Jaqsy district",
+      "country": "Kazakhstan",
+      "emoji": "🇰🇿",
+      "date": "2025-12-15T16:36:49.005Z",
+      "notes": "",
+      "position": {
+        "lat": 51.454007,
+        "lng": 67.763672
+      },
+      "id": 98443213
+    },
+    {
+      "cityName": "Nakhon Sawan",
+      "country": "Thailand",
+      "emoji": "🇹🇭",
+      "date": "2025-12-15T16:38:02.783Z",
+      "notes": "",
+      "position": {
+        "lat": 15.707663,
+        "lng": 100.140381
+      },
+      "id": 98443214
+    },
+    {
+      "cityName": "Santa Maria das Barreiras",
+      "country": "Brazil",
+      "emoji": "🇧🇷",
+      "date": "2025-12-15T16:38:24.178Z",
+      "notes": "",
+      "position": {
+        "lat": -8.407168,
+        "lng": -50.625
+      },
+      "id": 98443215
+    },
+    {
+      "cityName": "Şïeli District",
+      "country": "Kazakhstan",
+      "emoji": "🇰🇿",
+      "date": "2025-12-15T16:41:24.317Z",
+      "notes": "",
+      "position": {
+        "lat": 44.527843,
+        "lng": 66.005859
+      },
+      "id": 98443217
     }
   ]
 }

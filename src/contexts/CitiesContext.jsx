@@ -5,6 +5,16 @@ const DATABASE_URL = 'http://localhost:8000';
 
 const CitiesContext = createContext();
 
+function reducer(state, action) {
+  switch (action.type) {
+    case 'cities/loaded':
+      return action.payload;
+    case 'city/created':
+      return [...state, action.payload];
+  }
+  return state;
+}
+
 function CitiesProvider({ children }) {
   const [cities, setCities] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,14 +85,14 @@ function CitiesProvider({ children }) {
     return cities.find(city => city.id === parseInt(id));
   }, [cities]);
 
-  const handleCityClick = async (cityId) => {
+  const handleCityClick = useCallback(async (cityId) => {
     setSelectedCityId(cityId);
     setIsLoadingCity(true);
     // Simulate loading delay (you can remove this if not needed)
     setTimeout(() => {
       setIsLoadingCity(false);
     }, 1000);
-  };
+  }, []); // setSelectedCityId and setIsLoadingCity are stable, so empty deps is fine
 
   const value = useMemo(
     () => ({
@@ -94,9 +104,9 @@ function CitiesProvider({ children }) {
       handleCityClick,
       setSelectedCityId,
       createCity,
-      deleteCity, // Add deleteCity to context value
+      deleteCity,
     }),
-    [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity, deleteCity] // Include all dependencies
+    [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity, deleteCity, handleCityClick, setSelectedCityId]
   );
 
   return (
