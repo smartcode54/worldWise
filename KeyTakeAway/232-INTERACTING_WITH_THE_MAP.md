@@ -394,6 +394,205 @@ function DetectClick() {
 
 ---
 
+## STEP 7.7: Enhanced DetectClick - Clicking on Map While Form is Open
+
+### 7.7.1 Overview
+When the form is already open, clicking on the map should update the location immediately without navigating away. This provides a better user experience by allowing users to change the location while filling out the form.
+
+### 7.7.2 Implementation
+
+**Enhanced DetectClick Component:**
+```javascript
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useMapEvents } from 'react-leaflet';
+
+function DetectClick({ pathname, setSearchParams }) {
+  const navigate = useNavigate();
+
+  useMapEvents({
+    click: (e) => {
+      // Safely extract coordinates
+      const latlng = e.latlng;
+      
+      if (!latlng || typeof latlng.lat !== 'number' || typeof latlng.lng !== 'number') {
+        console.error("Invalid latlng in click event:", e);
+        return;
+      }
+      
+      let lat = latlng.lat;
+      let lng = latlng.lng;
+      
+      // Validate and normalize coordinates
+      if (lat < -90 || lat > 90) {
+        console.error(`Invalid latitude: ${lat}`);
+        return;
+      }
+      
+      if (lng < -180 || lng > 180) {
+        // Normalize longitude to -180 to 180 range
+        while (lng > 180) lng -= 360;
+        while (lng < -180) lng += 360;
+      }
+      
+      // Round to reasonable precision (6 decimal places)
+      const roundedLat = Number(lat.toFixed(6));
+      const roundedLng = Number(lng.toFixed(6));
+      
+      // If already on form page, update search params instead of navigating
+      if (pathname === "/app/form") {
+        setSearchParams({
+          lat: roundedLat.toString(),
+          lng: roundedLng.toString(),
+        });
+      } else {
+        // Navigate to form page with coordinates
+        navigate(`form?lat=${roundedLat}&lng=${roundedLng}`);
+      }
+    }
+  });
+}
+```
+
+**Key changes:**
+- Accepts `pathname` and `setSearchParams` as props
+- Checks if currently on form page (`pathname === "/app/form"`)
+- Updates URL search params if on form page (triggers form to fetch new data)
+- Navigates to form page if not already there
+
+### 7.7.3 Adding Temporary Marker for Clicked Location
+
+**Creating Pin Icon:**
+```javascript
+import L from 'leaflet';
+
+// Create a custom pin icon for temporary/clicked locations on form
+const createFlagIcon = () => {
+  return L.divIcon({
+    html: '<div style="font-size: 3rem; text-align: center;">📍</div>',
+    className: 'custom-flag-icon',
+    iconSize: [45, 45],
+    iconAnchor: [22.5, 45],
+    popupAnchor: [0, -45]
+  });
+};
+```
+
+**Displaying Temporary Marker:**
+```javascript
+import { useMemo } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
+
+function Map() {
+  const [searchParams] = useSearchParams();
+  const { pathname } = useLocation();
+  const maplat = searchParams.get("lat");
+  const maplng = searchParams.get("lng");
+  
+  // Create flag icon for temporary marker (memoized)
+  const flagIcon = useMemo(() => createFlagIcon(), []);
+  
+  return (
+    <MapContainer>
+      {/* Existing city markers */}
+      {cities.map((city) => (
+        <Marker key={city.id} position={[city.position.lat, city.position.lng]}>
+          <Popup>{city.cityName}</Popup>
+        </Marker>
+      ))}
+      
+      {/* Show temporary marker when on form page with lat/lng params */}
+      {pathname === "/app/form" && maplat && maplng && (
+        <Marker 
+          position={[Number(maplat), Number(maplng)]}
+          icon={flagIcon}
+        >
+          <Popup>
+            <span>New location</span>
+          </Popup>
+        </Marker>
+      )}
+      
+      <DetectClick pathname={pathname} setSearchParams={setSearchParams} />
+    </MapContainer>
+  );
+}
+```
+
+### 7.7.4 How It Works
+
+**User Flow:**
+1. User opens form page (`/app/form`)
+2. User clicks anywhere on the map
+3. `DetectClick` detects the click and checks if on form page
+4. Since on form page, it updates URL search params with new coordinates
+5. Temporary pin icon (📍) appears immediately at clicked location
+6. Form's `useEffect` detects URL param change and fetches new city data
+7. Form fields update with new location information
+
+**Benefits:**
+- ✅ Immediate visual feedback (pin icon appears instantly)
+- ✅ No page navigation (stays on form page)
+- ✅ Seamless location updates
+- ✅ Form automatically updates with new location data
+
+**Marker Types:**
+- **Blue marker**: Default marker for saved cities
+- **Red marker**: Selected/active city marker
+- **Pin icon (📍)**: Temporary marker for new location being added
+
+### 7.7.5 Complete Integration
+
+**Full Map Component with Enhanced Click Detection:**
+```javascript
+import { useMemo } from 'react';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import L from 'leaflet';
+
+function Map() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { pathname } = useLocation();
+  const maplat = searchParams.get("lat");
+  const maplng = searchParams.get("lng");
+  
+  // Create pin icon for temporary marker
+  const flagIcon = useMemo(() => createFlagIcon(), []);
+  
+  return (
+    <MapContainer center={mapPosition} zoom={13}>
+      <TileLayer url="..." />
+      
+      {/* Saved city markers */}
+      {cities.map((city) => (
+        <Marker key={city.id} position={[city.position.lat, city.position.lng]}>
+          <Popup>{city.cityName}</Popup>
+        </Marker>
+      ))}
+      
+      {/* Temporary pin marker for form */}
+      {pathname === "/app/form" && maplat && maplng && (
+        <Marker 
+          position={[Number(maplat), Number(maplng)]}
+          icon={flagIcon}
+        >
+          <Popup>New location</Popup>
+        </Marker>
+      )}
+      
+      <DetectClick pathname={pathname} setSearchParams={setSearchParams} />
+    </MapContainer>
+  );
+}
+```
+
+**Key Points:**
+- Temporary marker only shows when on form page AND has lat/lng params
+- Pin icon is larger (3rem font-size, 45x45 icon size) for better visibility
+- Icon is memoized to avoid recreating on every render
+- Coordinates are validated and normalized before use
+
+---
+
 ## STEP 8: Understanding useEffect for Updates
 
 ### 8.1 Why useEffect is Needed

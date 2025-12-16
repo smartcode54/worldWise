@@ -68,16 +68,17 @@ import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
 import { convertToEmoji } from "../utils";
 ### 3.2 Define API Base URL
-const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
+const BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
+const API_KEY = "e55a183b7d8749748a1832193dd86c74";
 
 **API Details:**
-- **Endpoint**: OpenStreetMap Nominatim Reverse Geocoding API
+- **Endpoint**: Geoapify Reverse Geocoding API
 - **Method**: GET
-- **Parameters**: `lat`, `lon`, `format=json`, `addressdetails=1`, `accept-language=en`
-- **Headers**: Requires `User-Agent` header (e.g., 'WorldWiseApp/1.0')
-- **Returns**: Address object with city, country name, country code, and other location data
-- **Rate Limit**: 1 request per second (suitable for user interactions)
-- **Free**: No API key required, no IP bans
+- **Parameters**: `apiKey`, `lat`, `lon`, `format=json`
+- **Headers**: No special headers required
+- **Returns**: Results array with location data including city, country name, country code, and other location details
+- **Rate Limit**: Depends on API plan (free tier available)
+- **API Key**: Required - must be included in request parameters
 
 ---
 
@@ -169,50 +170,89 @@ useEffect(function(){
       const latNum = Number(lat);
       const lngNum = Number(lng);
       
-      // Use URLSearchParams for proper URL encoding
-      const params = new URLSearchParams({
-        lat: latNum.toString(),
-        lon: lngNum.toString(),
-        format: 'json',
-        addressdetails: '1',
-        'accept-language': 'en'
-      });
-      
-      // Nominatim requires a User-Agent header
-      const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-        headers: {
-          'User-Agent': 'WorldWiseApp/1.0'
-        }
-      });
-      
-      if (!res.ok) throw new Error("Failed to fetch city data");
-      
-      const data = await res.json();
-      
-      // Nominatim response structure is different - data is in address object
-      if (!data || !data.address) {
-        setCityName("");
+      // Validate coordinates before making API call
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        const errorMsg = `Invalid coordinates: lat=${lat}, lng=${lng}`;
+        console.error(errorMsg);
+        setError(errorMsg);
         return;
       }
       
-      const address = data.address;
-      // Extract city name from various possible fields
-      const city = address.city || 
-                   address.town || 
-                   address.village || 
-                   address.municipality ||
-                   address.county ||
-                   address.state_district ||
+      if (latNum < -90 || latNum > 90) {
+        const errorMsg = `Latitude out of range: ${latNum}. Must be between -90 and 90.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      if (lngNum < -180 || lngNum > 180) {
+        const errorMsg = `Longitude out of range: ${lngNum}. Must be between -180 and 180.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      // Use URLSearchParams for proper URL encoding
+      // Geoapify API format: apiKey, lat, lon, format=json
+      const params = new URLSearchParams({
+        apiKey: API_KEY,
+        lat: latNum.toString(),
+        lon: lngNum.toString(),
+        format: 'json'
+      });
+      
+      const res = await fetch(`${BASE_URL}?${params.toString()}`);
+      
+      if (!res.ok) {
+        // Try to get error details from the response
+        let errorMessage = `Failed to fetch city data (${res.status} ${res.statusText})`;
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error("API Error Response:", errorData);
+        } catch {
+          // If response is not JSON, use the status text
+          console.error("API Error Status:", res.status, res.statusText);
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const data = await res.json();
+      
+      // Geoapify response structure - data is in results array
+      if (!data || !data.results || !Array.isArray(data.results) || data.results.length === 0) {
+        const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      const result = data.results[0];
+      // Extract city name from Geoapify response
+      const city = result.city || 
+                   result.town || 
+                   result.village || 
+                   result.municipality ||
+                   result.county ||
+                   result.suburb ||
                    "";
       
-      setCityName(city);
+      const countryName = result.country || "";
+      const countryCode = result.country_code?.toUpperCase() || "";
       
-      if (address.country_code) {
-        // Nominatim returns lowercase country codes, convert to uppercase
-        setEmoji(convertToEmoji(address.country_code.toUpperCase()));
+      if (!city && !countryName) {
+        const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
       }
+      
+      setCityName(city);
+      setCountryName(countryName);
+      setEmoji(convertToEmoji(countryCode));
     } catch (error) {
       console.error(error);
+      setError(`Failed to fetch city data: ${error.message}`);
     } finally {
       setIsLoadingGeocoding(false);
     }
@@ -224,42 +264,64 @@ useEffect(function(){
 - Returns early if `lat` or `lng` is missing
 - Prevents unnecessary API calls
 
+**Coordinate Validation:**
+- Validates that coordinates are valid numbers
+- Checks latitude is between -90 and 90
+- Checks longitude is between -180 and 180
+- Sets error message if validation fails
+
 **API Request:**
-- Constructs URL with `lat`, `lon`, `format`, `addressdetails`, and `accept-language` parameters
+- Constructs URL with `apiKey`, `lat`, `lon`, and `format=json` parameters
 - Uses `URLSearchParams` for proper URL encoding
-- Includes `User-Agent` header (required by Nominatim)
+- No special headers required
 - Uses `fetch()` for HTTP request
 - Checks response status with `res.ok`
+- Attempts to extract error details from response if request fails
 
 **Data Processing:**
 - Parses JSON response
-- Extracts city name from `address` object (checks multiple fields: `city`, `town`, `village`, `municipality`, `county`, `state_district`)
-- Extracts country code from `address.country_code` (converts to uppercase as Nominatim returns lowercase)
-- Converts country code to emoji using utility function
+- Checks if `results` array exists and has at least one element
+- Extracts first result from `results[0]`
+- Extracts city name from result object (checks multiple fields: `city`, `town`, `village`, `municipality`, `county`, `suburb`)
+- Extracts country name and country code from result
+- Converts country code to uppercase and converts to emoji using utility function
 
 **Error Handling:**
 - Wraps in try-catch block
+- Sets error state with descriptive messages
 - Logs errors to console
 - Always sets loading to false in `finally` block
+- Displays error messages to user in the form
 
 **Dependencies:**
 - Effect runs when `lat` or `lng` changes
 - Automatically fetches when user clicks map
 
-### 6.3 API Response Structureript
+### 6.3 API Response Structure
+```json
 {
-  address: {
-    city: "New York",
-    town: "Manhattan",  // Alternative if city not available
-    village: "...",     // Alternative if city/town not available
-    municipality: "...", // Alternative
-    county: "...",      // Alternative
-    state_district: "...", // Alternative
-    country: "United States",
-    country_code: "us"  // Lowercase, needs toUpperCase()
-  },
-  // ... other fields
-}---
+  "results": [
+    {
+      "city": "Bangkok",
+      "town": "...",           // Alternative if city not available
+      "village": "...",        // Alternative if city/town not available
+      "municipality": "...",   // Alternative
+      "county": "...",         // Alternative
+      "suburb": "Wang Thonglang District",  // Alternative
+      "country": "Thailand",
+      "country_code": "th",    // Lowercase, needs toUpperCase()
+      "postcode": "10310",
+      "street": "Soi Lat Phrao 91",
+      "formatted": "Soi Lat Phrao 91, Wang Thonglang District, 10310, Thailand",
+      // ... other fields
+    }
+  ],
+  "query": {
+    "lat": 13.786791066345813,
+    "lon": 100.62043289671124
+  }
+}
+```---
 
 ## STEP 7: Build the Form UI
 
@@ -367,17 +429,24 @@ const [country, setCountry] = useState("");  // Never used**Solution:** Use the 
 ## STEP 9: Complete Implementation
 
 ### 9.1 Full Form Component Codeript
-// Using OpenStreetMap Nominatim API - free, no API key required
-// "https://nominatim.openstreetmap.org/reverse?lat=0&lon=0&format=json"
+// Using Geoapify API for reverse geocoding
+// "https://api.geoapify.com/v1/geocode/reverse?lat=0&lon=0&format=json&apiKey=API_KEY"
 
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Button from "./Button";
 import BackButton from "./BackButton";
+import Spinner from "./Spinner";
 import styles from "./Form.module.css";
 import useUrlPosition from "../hooks/useUrlPosition";
+import { useCities } from "../contexts/CitiesContext";
 import { convertToEmoji } from "../utils";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
-const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
+// Using Geoapify API
+const BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
+const API_KEY = "e55a183b7d8749748a1832193dd86c74";
 
 // Helper function to format date to datetime-local format
 function formatDateTimeLocal(date) {
@@ -403,65 +472,126 @@ function formatDateTimeLocal(date) {
 
 function Form() {  
   const [lat, lng] = useUrlPosition();
+  const navigate = useNavigate();
   
   const [cityName, setCityName] = useState("");
+  const [countryName, setCountryName] = useState("");
   const [emoji, setEmoji] = useState("");
-  const [date, setDate] = useState(() => formatDateTimeLocal(new Date()));
+  const [date, setDate] = useState(new Date()); // DatePicker expects Date object
   const [notes, setNotes] = useState("");
   const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const { createCity } = useCities();
 
   useEffect(function(){
     async function fetchCityData() {
-      if (!lat || !lng) return;
+      if (!lat || !lng) {
+        // Clear form if no coordinates
+        setCityName("");
+        setCountryName("");
+        setEmoji("");
+        setError("");
+        return;
+      }
+      
+      // Reset form state when coordinates change
+      setCityName("");
+      setCountryName("");
+      setEmoji("");
+      setError("");
+      
+      // Validate coordinates before making API call
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      
+      if (isNaN(latNum) || isNaN(lngNum)) {
+        const errorMsg = `Invalid coordinates: lat=${lat}, lng=${lng}`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      if (latNum < -90 || latNum > 90) {
+        const errorMsg = `Latitude out of range: ${latNum}. Must be between -90 and 90.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
+      if (lngNum < -180 || lngNum > 180) {
+        const errorMsg = `Longitude out of range: ${lngNum}. Must be between -180 and 180.`;
+        console.error(errorMsg);
+        setError(errorMsg);
+        return;
+      }
+      
       try {
         setIsLoadingGeocoding(true);
-        const latNum = Number(lat);
-        const lngNum = Number(lng);
-        
         // Use URLSearchParams for proper URL encoding
+        // Geoapify API format: apiKey, lat, lon, format=json
         const params = new URLSearchParams({
+          apiKey: API_KEY,
           lat: latNum.toString(),
           lon: lngNum.toString(),
-          format: 'json',
-          addressdetails: '1',
-          'accept-language': 'en'
+          format: 'json'
         });
+        const url = `${BASE_URL}?${params.toString()}`;
+        console.log("Fetching from:", url);
         
-        // Nominatim requires a User-Agent header
-        const res = await fetch(`${BASE_URL}?${params.toString()}`, {
-          headers: {
-            'User-Agent': 'WorldWiseApp/1.0'
+        const res = await fetch(url);
+        
+        if (!res.ok) {
+          // Try to get error details from the response
+          let errorMessage = `Failed to fetch city data (${res.status} ${res.statusText})`;
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.error || errorMessage;
+            console.error("API Error Response:", errorData);
+          } catch {
+            // If response is not JSON, use the status text
+            console.error("API Error Status:", res.status, res.statusText);
           }
-        });
-        
-        if (!res.ok) throw new Error("Failed to fetch city data");
+          throw new Error(errorMessage);
+        }
         
         const data = await res.json();
+        console.log("Fetched city data:", data);
         
-        // Nominatim response structure - data is in address object
-        if (!data || !data.address) {
-          setCityName("");
+        // Geoapify response structure - data is in results array
+        if (!data || !data.results || !Array.isArray(data.results) || data.results.length === 0) {
+          const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
+          console.error(errorMsg);
+          setError(errorMsg);
           return;
         }
         
-        const address = data.address;
-        const city = address.city || 
-                     address.town || 
-                     address.village || 
-                     address.municipality ||
-                     address.county ||
-                     address.state_district ||
+        const result = data.results[0];
+        // Extract city name from Geoapify response
+        const city = result.city || 
+                     result.town || 
+                     result.village || 
+                     result.municipality ||
+                     result.county ||
+                     result.suburb ||
                      "";
         
-        setCityName(city);
+        const countryName = result.country || "";
+        const countryCode = result.country_code?.toUpperCase() || "";
         
-        if (address.country_code) {
-          // Nominatim returns lowercase country codes, convert to uppercase
-          setEmoji(convertToEmoji(address.country_code.toUpperCase()));
+        if (!city && !countryName) {
+          const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
+          console.error(errorMsg);
+          setError(errorMsg);
+          return;
         }
+        
+        setCityName(city);
+        setCountryName(countryName);
+        setEmoji(convertToEmoji(countryCode));
       } catch (error) {
         console.error(error);
+        setError(`Failed to fetch city data: ${error.message}`);
       } finally {
         setIsLoadingGeocoding(false);
       }
@@ -470,16 +600,58 @@ function Form() {
   }, [lat, lng]);
 
 
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!cityName || !date) return;
+    
+    // Convert date to ISO string if it's a Date object
+    const dateValue = date instanceof Date ? date.toISOString() : date;
+    
+    const newCity = {
+      cityName,
+      country: countryName,
+      emoji,
+      date: dateValue,
+      notes,
+      position: {
+        lat: Number(lat),
+        lng: Number(lng),
+      },
+    };
+    
+    try {
+      setIsSubmitting(true);
+      setError("");
+      const createdCity = await createCity(newCity);
+      
+      // Navigate to the city detail page after successful creation
+      if (createdCity && createdCity.id) {
+        const latParam = createdCity.position?.lat || lat;
+        const lngParam = createdCity.position?.lng || lng;
+        navigate(`/app/cities/${createdCity.id}?lat=${latParam}&lng=${lngParam}`);
+      }
+    } catch (error) {
+      console.error('Failed to create city:', error);
+      setError(`Failed to add city: ${error.message}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <form className={styles.form}>
-      {isLoadingGeocoding && <p>Loading city data...</p>}
+    <form className={styles.form} onSubmit={handleSubmit}>
+      {isLoadingGeocoding && <Spinner />}
+      {error && <p style={{ color: 'red', padding: '1rem', background: '#ffebee', borderRadius: '5px' }}>{error}</p>}
       
       <div className={styles.row}>
         <label htmlFor="cityName">City name</label>
         <input
           id="cityName"
-          onChange={(e) => setCityName(e.target.value)}
-          value={cityName}
+          onChange={(e) => {
+            const value = e.target.value;
+            setCityName(value);
+          }}
+          value={isLoadingGeocoding ? "Loading..." : (cityName && countryName ? `${cityName}, ${countryName}` : cityName)}
           disabled={isLoadingGeocoding}
         />
         {emoji && <span className={styles.flag}>{emoji}</span>}
@@ -487,11 +659,12 @@ function Form() {
 
       <div className={styles.row}>
         <label htmlFor="date">When did you go to {cityName || "this city"}?</label>
-        <input
+        <DatePicker
           id="date"
-          type="datetime-local"
-          onChange={(e) => setDate(e.target.value)}
-          value={date}
+          onChange={(selectedDate) => setDate(selectedDate || new Date())}
+          selected={date}
+          dateFormat="dd/MM/yyyy"
+          disabled={isLoadingGeocoding}
         />
       </div>
 
@@ -505,7 +678,9 @@ function Form() {
       </div>
 
       <div className={styles.buttons}>
-        <Button type="primary">Add</Button>
+        <Button type="primary" onClick={handleSubmit} disabled={isSubmitting || isLoadingGeocoding}>
+          {isSubmitting ? "Adding..." : "Add"}
+        </Button>
         <BackButton type="back" />
       </div>
     </form>
@@ -535,14 +710,19 @@ useUrlPosition() extracts [lat, lng]
   ↓
 useEffect detects coordinates
   ↓
-API Call: reverse?lat=40.7128&lon=-74.0060&format=json&addressdetails=1
+Coordinate validation (lat: -90 to 90, lng: -180 to 180)
   ↓
-Response: { address: { city: "New York", country: "United States", country_code: "us" }, ... }
+API Call: reverse?apiKey=API_KEY&lat=40.7128&lon=-74.0060&format=json
+  ↓
+Response: { results: [{ city: "New York", country: "United States", country_code: "us", ... }], ... }
+  ↓
+Extract first result: results[0]
   ↓
 setCityName("New York")
+setCountryName("United States")
 setEmoji(convertToEmoji("US")) → "🇺🇸"  // Note: country_code converted to uppercase
   ↓
-Form displays: "New York 🇺🇸"
+Form displays: "New York, United States 🇺🇸"
 ```
 
 ### 10.3 Key Integration Points
@@ -724,14 +904,19 @@ function useUrlPosition() {
 
 This guide covered:
 - ✅ Creating `useUrlPosition` hook to read URL parameters
-- ✅ Fetching city data using reverse geocoding API
+- ✅ Fetching city data using Geoapify reverse geocoding API
+- ✅ Validating coordinates before making API calls
 - ✅ Converting country codes to flag emojis
-- ✅ Formatting dates for datetime-local inputs
-- ✅ Handling loading and error states
-- ✅ Auto-populating form fields with API data
+- ✅ Handling loading and error states with proper error messages
+- ✅ Auto-populating form fields with API data (city name, country name, emoji)
 - ✅ Preventing geolocation from overwriting map clicks
 - ✅ Resetting map center when navigating back
 - ✅ Using coordinate keys to ensure form updates when coordinates change
 - ✅ Common errors and their solutions
+
+**API Used:** Geoapify Reverse Geocoding API
+- **Endpoint**: `https://api.geoapify.com/v1/geocode/reverse`
+- **Response Format**: Results array with location data
+- **Key Features**: Requires API key, returns structured location data including city, country, and country code
 
 The form now automatically fetches and displays city information when users click on the map, providing a seamless user experience. The map properly handles geolocation requests, map clicks, and navigation, ensuring data always updates correctly and the map resets to default center when needed.

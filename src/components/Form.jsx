@@ -1,5 +1,5 @@
-// Using OpenStreetMap Nominatim API - free, no API key required
-// "https://nominatim.openstreetmap.org/reverse?lat=0&lon=0&format=json"
+// Using Geoapify API for reverse geocoding
+// "https://api.geoapify.com/v1/geocode/reverse?lat=0&lon=0&format=json&apiKey=API_KEY"
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,8 +13,9 @@ import { convertToEmoji } from "../utils";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-// Using OpenStreetMap Nominatim - free, no API key required, no IP bans
-const BASE_URL = "https://nominatim.openstreetmap.org/reverse";
+// Using Geoapify API
+const BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
+const API_KEY = "e55a183b7d8749748a1832193dd86c74";
 
 function Form() {  
   const [lat, lng] = useUrlPosition();
@@ -76,30 +77,24 @@ function Form() {
       try {
         setIsLoadingGeocoding(true);
         // Use URLSearchParams for proper URL encoding
-        // Nominatim API format: lat, lon, format=json
+        // Geoapify API format: apiKey, lat, lon, format=json
         const params = new URLSearchParams({
+          apiKey: API_KEY,
           lat: latNum.toString(),
           lon: lngNum.toString(),
-          format: 'json',
-          addressdetails: '1',
-          'accept-language': 'en'
+          format: 'json'
         });
         const url = `${BASE_URL}?${params.toString()}`;
         console.log("Fetching from:", url);
         
-        // Nominatim requires a User-Agent header
-        const res = await fetch(url, {
-          headers: {
-            'User-Agent': 'WorldWiseApp/1.0' // Required by Nominatim
-          }
-        });
+        const res = await fetch(url);
         
         if (!res.ok) {
           // Try to get error details from the response
           let errorMessage = `Failed to fetch city data (${res.status} ${res.statusText})`;
           try {
             const errorData = await res.json();
-            errorMessage = errorData.error?.message || errorMessage;
+            errorMessage = errorData.error || errorMessage;
             console.error("API Error Response:", errorData);
           } catch {
             // If response is not JSON, use the status text
@@ -111,26 +106,26 @@ function Form() {
         const data = await res.json();
         console.log("Fetched city data:", data);
         
-        // Nominatim response structure is different
-        if (!data || !data.address) {
+        // Geoapify response structure - data is in results array
+        if (!data || !data.results || !Array.isArray(data.results) || data.results.length === 0) {
           const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;
           console.error(errorMsg);
           setError(errorMsg);
           return;
         }
         
-        const address = data.address;
-        // Extract city name from various possible fields in Nominatim response
-        const city = address.city || 
-                     address.town || 
-                     address.village || 
-                     address.municipality ||
-                     address.county ||
-                     address.state_district ||
+        const result = data.results[0];
+        // Extract city name from Geoapify response
+        const city = result.city || 
+                     result.town || 
+                     result.village || 
+                     result.municipality ||
+                     result.county ||
+                     result.suburb ||
                      "";
         
-        const countryName = address.country || "";
-        const countryCode = address.country_code?.toUpperCase() || "";
+        const countryName = result.country || "";
+        const countryCode = result.country_code?.toUpperCase() || "";
         
         if (!city && !countryName) {
           const errorMsg = `No location data found for coordinates: lat=${latNum}, lng=${lngNum}. Please try a different location.`;

@@ -41,6 +41,18 @@ const selectedIcon = new L.Icon({
   shadowSize: [41, 41]
 });
 
+// Create a custom pin icon for temporary/clicked locations on form
+// Using DivIcon with pin emoji for better visibility
+const createFlagIcon = () => {
+  return L.divIcon({
+    html: '<div style="font-size: 3rem; text-align: center;">📍</div>',
+    className: 'custom-flag-icon',
+    iconSize: [45, 45],
+    iconAnchor: [22.5, 45],
+    popupAnchor: [0, -45]
+  });
+};
+
 function Map() {
   const { isLoading: isLoadingPosition,
           position: geolocationPosition, 
@@ -58,6 +70,9 @@ function Map() {
   // Get current city ID from URL params
   const currentCityId = params?.id ? parseInt(params.id) : null;
   const activeCityId = currentCityId || selectedCityId;
+  
+  // Create flag icon for temporary marker (memoized)
+  const flagIcon = useMemo(() => createFlagIcon(), []);
   
   //use memo to memoize the map position is right way to do it because it will not re-render the map position when the map lat and lng change
   const mapPosition = useMemo(() => {
@@ -125,9 +140,20 @@ function Map() {
             </Popup>
           </Marker>
         ))}
+        {/* Show temporary marker when on form page with lat/lng params */}
+        {pathname === "/app/form" && maplat && maplng && (
+          <Marker 
+            position={[Number(maplat), Number(maplng)]}
+            icon={flagIcon}
+          >
+            <Popup>
+              <span>New location</span>
+            </Popup>
+          </Marker>
+        )}
         <ChangeCenter position={mapPosition} pathname={pathname} />
         <FitBounds cities={cities} pathname={pathname} />
-        <DetectClick />
+        <DetectClick pathname={pathname} setSearchParams={setSearchParams} />
       </MapContainer>
     </div>
   );
@@ -178,7 +204,7 @@ function FitBounds({cities, pathname}) {
   return null;
 }
 
-function DetectClick() {
+function DetectClick({ pathname, setSearchParams }) {
   const navigate = useNavigate();
 
   useMapEvents({
@@ -232,8 +258,18 @@ function DetectClick() {
       const roundedLat = Number(lat.toFixed(6));
       const roundedLng = Number(lng.toFixed(6));
       
-      console.log(`Navigating with coordinates: lat=${roundedLat}, lng=${roundedLng}`);
-      navigate(`form?lat=${roundedLat}&lng=${roundedLng}`);
+      console.log(`Click coordinates: lat=${roundedLat}, lng=${roundedLng}`);
+      
+      // ✅ If already on form page, update search params instead of navigating
+      if (pathname === "/app/form") {
+        setSearchParams({
+          lat: roundedLat.toString(),
+          lng: roundedLng.toString(),
+        });
+      } else {
+        // Navigate to form page with coordinates
+        navigate(`form?lat=${roundedLat}&lng=${roundedLng}`);
+      }
     }
   });
 }

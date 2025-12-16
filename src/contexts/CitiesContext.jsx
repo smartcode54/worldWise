@@ -1,49 +1,117 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState, useEffect, useContext, useMemo, useCallback } from 'react';
+import { createContext, useReducer, useEffect, useContext, useMemo, useCallback } from 'react';
 
 const DATABASE_URL = 'http://localhost:8000';
 
 const CitiesContext = createContext();
 
-function reducer(state, action) {
+const initialState = {
+  cities: [],
+  isLoading: true, // Start as true since we fetch on mount
+  currentCity: null,
+  isLoadingCity: false,
+  error: null,
+};
+
+function citiesReducer(state, action) {
   switch (action.type) {
+    case 'loading/started':
+      return { ...state, isLoading: true, error: null };
+    
+    case 'loading/finished':
+      return { ...state, isLoading: false };
+    
+    case 'city/loading-started':
+      return { ...state, isLoadingCity: true, error: null };
+    
+    case 'city/loading-finished':
+      return { ...state, isLoadingCity: false };
+    
     case 'cities/loaded':
-      return action.payload;
+      return {
+        ...state,
+        cities: action.payload,
+        isLoading: false,
+        error: null,
+      };
+    
     case 'city/created':
-      return [...state, action.payload];
+      return {
+        ...state,
+        cities: [...state.cities, action.payload],
+        error: null,
+      };
+    
+    case 'city/deleted':
+      return {
+        ...state,
+        cities: state.cities.filter(city => city.id !== action.payload),
+        currentCity: state.currentCity?.id === action.payload 
+          ? null 
+          : state.currentCity,
+        error: null,
+      };
+    
+    case 'city/selected':
+      return {
+        ...state,
+        currentCity: action.payload,
+        isLoadingCity: false,
+        error: null,
+      };
+    
+    case 'city/deselected':
+      return {
+        ...state,
+        currentCity: null,
+        error: null,
+      };
+    
+    case 'error/occurred':
+      return {
+        ...state,
+        error: action.payload,
+        isLoading: false,
+        isLoadingCity: false,
+      };
+    
+    case 'error/cleared':
+      return {
+        ...state,
+        error: null,
+      };
+    
+    default:
+      throw new Error(`Unknown action type: ${action.type}`);
   }
-  return state;
 }
 
 function CitiesProvider({ children }) {
-  const [cities, setCities] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedCityId, setSelectedCityId] = useState(null);
-  const [isLoadingCity, setIsLoadingCity] = useState(false);
-    
+  const [state, dispatch] = useReducer(citiesReducer, initialState);
+  const { cities, isLoading, currentCity, isLoadingCity, error } = state;
 
-  useEffect(() => {
-    async function fetchCities() {
-      try {
-        setIsLoading(true);
-        const res = await fetch(`${DATABASE_URL}/cities`);
-        if (!res.ok) throw new Error('Failed to fetch cities');
-        const data = await res.json();
-        console.log('API Response:', data);
-        // json-server returns array directly at /cities endpoint
-        // If it returns { cities: [...] }, use: setCities(data.cities)
-        setCities(Array.isArray(data) ? data : data.cities || []);
-      } catch (error) {
-        console.error('Error fetching cities:', error);
-        setCities([]);
-      } finally {
-        setIsLoading(false);
-      }
+  const fetchCities = useCallback(async () => {
+    try {
+      dispatch({ type: 'loading/started' });
+      
+      const res = await fetch(`${DATABASE_URL}/cities`);
+      if (!res.ok) throw new Error('Failed to fetch cities');
+      
+      const data = await res.json();
+      console.log('API Response:', data);
+      const citiesArray = Array.isArray(data) ? data : data.cities || [];
+      
+      dispatch({ type: 'cities/loaded', payload: citiesArray });
+    } catch (error) {
+      console.error('Error fetching cities:', error);
+      dispatch({ type: 'error/occurred', payload: error.message });
     }
-    fetchCities();
   }, []);
 
-  // Moved createCity outside useEffect and use functional update
+  useEffect(() => {
+    fetchCities();
+  }, [fetchCities]);
+
   const createCity = useCallback(async (newCity) => {
     try {
       const res = await fetch(`${DATABASE_URL}/cities`, {
@@ -53,60 +121,90 @@ function CitiesProvider({ children }) {
           'Content-Type': 'application/json',
         },
       });
+      
       if (!res.ok) throw new Error('Failed to create city');
-      const data = await res.json(); // Parse JSON once
+      
+      const data = await res.json();
       console.log('API Response:', data);
-      // Use functional update to avoid dependency on cities
-      setCities((c) => [...c, data]);
+      
+      dispatch({ type: 'city/created', payload: data });
       return data;
     } catch (error) {
       console.error('Error creating city:', error);
+      dispatch({ type: 'error/occurred', payload: error.message });
       throw error;
     }
-  }, []); // No dependencies needed since we use functional update
+  }, []);
 
-  // Delete city function
   const deleteCity = useCallback(async (id) => {
     try {
       const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
         method: 'DELETE',
       });
+      
       if (!res.ok) throw new Error('Failed to delete city');
-      // Use functional update to avoid dependency on cities
-      setCities((c) => c.filter((city) => city.id !== id));
+      
+      dispatch({ type: 'city/deleted', payload: id });
     } catch (error) {
       console.error('Error deleting city:', error);
+      dispatch({ type: 'error/occurred', payload: error.message });
       throw error;
     }
-  }, []); // No dependencies needed since we use functional update
+  }, []);
 
-  // Wrapped getCity in useCallback
   const getCity = useCallback((id) => {
     return cities.find(city => city.id === parseInt(id));
   }, [cities]);
 
   const handleCityClick = useCallback(async (cityId) => {
-    setSelectedCityId(cityId);
-    setIsLoadingCity(true);
-    // Simulate loading delay (you can remove this if not needed)
-    setTimeout(() => {
-      setIsLoadingCity(false);
-    }, 1000);
-  }, []); // setSelectedCityId and setIsLoadingCity are stable, so empty deps is fine
+    try {
+      dispatch({ type: 'city/loading-started' });
+      
+      const city = cities.find(c => c.id === parseInt(cityId));
+      
+      if (city) {
+        // Simulate loading delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        dispatch({ type: 'city/selected', payload: city });
+      } else {
+        throw new Error('City not found');
+      }
+    } catch (error) {
+      console.error('Error selecting city:', error);
+      dispatch({ type: 'error/occurred', payload: error.message });
+    }
+  }, [cities]);
+
+  // Backward compatibility: derive selectedCityId from currentCity
+  const selectedCityId = currentCity?.id || null;
+  
+  const setSelectedCityId = useCallback((id) => {
+    if (id === null) {
+      dispatch({ type: 'city/deselected' });
+    } else {
+      const city = cities.find(c => c.id === parseInt(id));
+      if (city) {
+        dispatch({ type: 'city/selected', payload: city });
+      }
+    }
+  }, [cities]);
 
   const value = useMemo(
     () => ({
       cities,
       isLoading,
-      getCity,
-      selectedCityId,
+      currentCity,
       isLoadingCity,
+      error,
+      getCity,
+      selectedCityId, // Backward compatibility
       handleCityClick,
-      setSelectedCityId,
+      setSelectedCityId, // Backward compatibility
       createCity,
       deleteCity,
+      fetchCities,
     }),
-    [cities, isLoading, selectedCityId, isLoadingCity, getCity, createCity, deleteCity, handleCityClick, setSelectedCityId]
+    [cities, isLoading, currentCity, isLoadingCity, error, getCity, selectedCityId, handleCityClick, setSelectedCityId, createCity, deleteCity, fetchCities]
   );
 
   return (
