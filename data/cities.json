@@ -11,6 +11,18 @@
         "lng": -4.221129
       },
       "id": 1
+    },
+    {
+      "cityName": "Taounate",
+      "country": "Morocco",
+      "emoji": "🇲🇦",
+      "date": "2025-12-17T14:53:01.412Z",
+      "notes": "",
+      "position": {
+        "lat": 34.288992,
+        "lng": -4.63623
+      },
+      "id": 2
     }
   ]
 }
