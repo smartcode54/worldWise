@@ -94,7 +94,7 @@ function CitiesProvider({ children }) {
       if (!res.ok) throw new Error('Failed to fetch cities');
 
       const data = await res.json();
-      console.log('API Response:', data);
+      // console.log('API Response:', data);
       const citiesArray = Array.isArray(data) ? data : data.cities || [];
 
       dispatch({ type: 'cities/loaded', payload: citiesArray });
@@ -121,7 +121,7 @@ function CitiesProvider({ children }) {
       if (!res.ok) throw new Error('Failed to create city');
 
       const data = await res.json();
-      console.log('API Response:', data);
+      // console.log('API Response:', data);
 
       dispatch({ type: 'city/created', payload: data });
       return data;

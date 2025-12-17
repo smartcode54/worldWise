@@ -1,6 +1,6 @@
 import styles from "./Login.module.css";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import PageNav from "../components/PageNav";
 import { useAuth } from "../contexts/FakeAuthContext";
 
@@ -10,12 +10,22 @@ export default function Login() {
   const [password, setPassword] = useState("qwerty");
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Get the location they were trying to access before being redirected to login
+  const from = location.state?.from?.pathname || "/app";
 
   useEffect(() => {
     if (isAuthenticated === true) {
-      navigate("/app");
+      // Redirect to the page they were trying to access, or /app as default
+      navigate(from, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, from]);
+
+  // If already authenticated, redirect immediately
+  if (isAuthenticated === true) {
+    return <Navigate to={from} replace />;
+  }
 
   function handleSubmit(e) {
     e.preventDefault();

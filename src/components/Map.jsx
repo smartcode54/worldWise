@@ -154,6 +154,7 @@ function Map() {
         <ChangeCenter position={mapPosition} pathname={pathname} />
         <FitBounds cities={cities} pathname={pathname} />
         <DetectClick pathname={pathname} setSearchParams={setSearchParams} />
+        <MapResizeHandler />
       </MapContainer>
     </div>
   );
@@ -272,6 +273,41 @@ function DetectClick({ pathname, setSearchParams }) {
       }
     }
   });
+}
+
+// Component to handle map resize and fix incomplete rendering
+function MapResizeHandler() {
+  const map = useMap();
+
+  useEffect(() => {
+    // Invalidate size on mount to fix incomplete rendering
+    // This is especially important when map renders inside protected routes
+    map.invalidateSize();
+
+    // Also handle window resize events
+    const handleResize = () => {
+      map.invalidateSize();
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [map]);
+
+  // Also invalidate size when map becomes visible (handles ProtectedRoute timing)
+  useEffect(() => {
+    // Small delay to ensure container has proper dimensions
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [map]);
+
+  return null;
 }
 
 export default Map;
