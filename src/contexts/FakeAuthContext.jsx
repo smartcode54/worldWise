@@ -18,29 +18,55 @@ function reducer(state, action) {
           throw new Error("Unknown action type");
      }
 }
-const FAKE_USER = {
+// ⚠️ FAKE AUTHENTICATION - FOR DEVELOPMENT/TESTING ONLY ⚠️
+// In production, passwords should NEVER be stored in plain text or in code.
+// Real applications should:
+// 1. Hash passwords using bcrypt/argon2 before storing in database
+// 2. Compare hashed passwords, never plain text
+// 3. Use environment variables for sensitive data (never commit to git)
+// 4. Implement proper authentication with JWT tokens or sessions
+
+// Fake user credentials (for testing purposes only)
+const FAKE_USER_CREDENTIALS = {
+     email: "jack@example.com",
+     password: "qwerty", // ⚠️ Plain text password - ONLY for fake auth
+}
+
+// User data (without password - never store passwords in state)
+const FAKE_USER_DATA = {
      name: "Jack",
      email: "jack@example.com",
-     password: "qwerty",
      avatar: "https://i.pravatar.cc/100?u=zz",
 }
 
 function AuthProvider({ children }) {
      const [{user, isAuthenticated}, dispatch] = useReducer(reducer, initialState);
-     return<AuthContext.Provider value={{user, isAuthenticated, login, logout}}>
-          {children}
-          </AuthContext.Provider>
-}
 
-function login(email, password) {
-     if (email === FAKE_USER.email && password === FAKE_USER.password) {
-          dispatch({type: 'login', payload: FAKE_USER});
+     function login(email, password) {
+          // ⚠️ FAKE AUTHENTICATION - Plain text comparison (NOT secure for production)
+          // In production, you would:
+          // 1. Hash the input password
+          // 2. Compare with stored hash from database
+          // 3. Use libraries like bcrypt.compare(password, hashedPassword)
+          
+          if (email === FAKE_USER_CREDENTIALS.email && 
+              password === FAKE_USER_CREDENTIALS.password) {
+               // Only store user data, NEVER store password in state
+               dispatch({type: 'login', payload: FAKE_USER_DATA});
+               return;
+          }
+          throw new Error("Invalid email or password");
      }
-     throw new Error("Invalid email or password");
-}
 
-function logout() {
-     dispatch({type: 'logout'});
+     function logout() {
+          dispatch({type: 'logout'});
+     }
+
+     return (
+          <AuthContext.Provider value={{user, isAuthenticated, login, logout}}>
+               {children}
+          </AuthContext.Provider>
+     );
 }
 
 function useAuth() {
@@ -50,4 +76,6 @@ function useAuth() {
      }
      return context;
 }
-export { AuthProvider, useAuth, login, logout };
+
+// eslint-disable-next-line react-refresh/only-export-components
+export { AuthProvider, useAuth };
