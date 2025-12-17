@@ -15,18 +15,6 @@ const initialState = {
 
 function citiesReducer(state, action) {
   switch (action.type) {
-    case 'loading/started':
-      return { ...state, isLoading: true, error: null };
-    
-    case 'loading/finished':
-      return { ...state, isLoading: false };
-    
-    case 'city/loading-started':
-      return { ...state, isLoadingCity: true, error: null };
-    
-    case 'city/loading-finished':
-      return { ...state, isLoadingCity: false };
-    
     case 'cities/loaded':
       return {
         ...state,
@@ -34,24 +22,32 @@ function citiesReducer(state, action) {
         isLoading: false,
         error: null,
       };
-    
     case 'city/created':
       return {
         ...state,
         cities: [...state.cities, action.payload],
         error: null,
       };
-    
     case 'city/deleted':
       return {
         ...state,
         cities: state.cities.filter(city => city.id !== action.payload),
-        currentCity: state.currentCity?.id === action.payload 
-          ? null 
+        currentCity: state.currentCity?.id === action.payload
+          ? null
           : state.currentCity,
         error: null,
       };
-    
+    case 'loading/started':
+      return { ...state, isLoading: true, error: null };
+
+    case 'loading/finished':
+      return { ...state, isLoading: false };
+
+    case 'city/loading-started':
+      return { ...state, isLoadingCity: true, error: null };
+
+    case 'city/loading-finished':
+      return { ...state, isLoadingCity: false };
     case 'city/selected':
       return {
         ...state,
@@ -59,14 +55,14 @@ function citiesReducer(state, action) {
         isLoadingCity: false,
         error: null,
       };
-    
+
     case 'city/deselected':
       return {
         ...state,
         currentCity: null,
         error: null,
       };
-    
+
     case 'error/occurred':
       return {
         ...state,
@@ -74,13 +70,13 @@ function citiesReducer(state, action) {
         isLoading: false,
         isLoadingCity: false,
       };
-    
+
     case 'error/cleared':
       return {
         ...state,
         error: null,
       };
-    
+
     default:
       throw new Error(`Unknown action type: ${action.type}`);
   }
@@ -93,14 +89,14 @@ function CitiesProvider({ children }) {
   const fetchCities = useCallback(async () => {
     try {
       dispatch({ type: 'loading/started' });
-      
+
       const res = await fetch(`${DATABASE_URL}/cities`);
       if (!res.ok) throw new Error('Failed to fetch cities');
-      
+
       const data = await res.json();
       console.log('API Response:', data);
       const citiesArray = Array.isArray(data) ? data : data.cities || [];
-      
+
       dispatch({ type: 'cities/loaded', payload: citiesArray });
     } catch (error) {
       console.error('Error fetching cities:', error);
@@ -121,12 +117,12 @@ function CitiesProvider({ children }) {
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (!res.ok) throw new Error('Failed to create city');
-      
+
       const data = await res.json();
       console.log('API Response:', data);
-      
+
       dispatch({ type: 'city/created', payload: data });
       return data;
     } catch (error) {
@@ -141,9 +137,9 @@ function CitiesProvider({ children }) {
       const res = await fetch(`${DATABASE_URL}/cities/${id}`, {
         method: 'DELETE',
       });
-      
+
       if (!res.ok) throw new Error('Failed to delete city');
-      
+
       dispatch({ type: 'city/deleted', payload: id });
     } catch (error) {
       console.error('Error deleting city:', error);
@@ -159,9 +155,9 @@ function CitiesProvider({ children }) {
   const handleCityClick = useCallback(async (cityId) => {
     try {
       dispatch({ type: 'city/loading-started' });
-      
+
       const city = cities.find(c => c.id === parseInt(cityId));
-      
+
       if (city) {
         // Simulate loading delay
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -177,7 +173,7 @@ function CitiesProvider({ children }) {
 
   // Backward compatibility: derive selectedCityId from currentCity
   const selectedCityId = currentCity?.id || null;
-  
+
   const setSelectedCityId = useCallback((id) => {
     if (id === null) {
       dispatch({ type: 'city/deselected' });
