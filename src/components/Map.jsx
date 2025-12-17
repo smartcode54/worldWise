@@ -7,6 +7,22 @@ import { useCities } from '../contexts/CitiesContext';
 import useGeolocation from '../hooks/useGeolocaion';
 import Button from './Button';
 
+// Geoapify API configuration
+// ⚠️ IMPORTANT: All credentials are loaded from .env file
+// Get your API key from: https://www.geoapify.com/get-started-with-maps-api
+// Add to .env file: VITE_GEOAPIFY_API_KEY=your-key-here
+const GEOAPIFY_API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY;
+
+// Geoapify map style options (can also be set in .env as VITE_GEOAPIFY_MAP_STYLE):
+// - 'osm-bright' - Bright OpenStreetMap style
+// - 'osm-bright-grey' - Grey OpenStreetMap style
+// - 'dark-matter' - Dark theme
+// - 'positron' - Light theme
+// - 'klokantech-basic' - Basic style
+// - 'osm-liberty' - Liberty style
+// See more at: https://apidocs.geoapify.com/docs/maps/
+const GEOAPIFY_MAP_STYLE = import.meta.env.VITE_GEOAPIFY_MAP_STYLE || 'osm-bright';
+
 // Fix for default marker icons
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
@@ -125,10 +141,18 @@ function Map() {
       </Button>
 
       <MapContainer className={styles.map} center={mapPosition} zoom={13} scrollWheelZoom={true}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> smartCode54'
-          url="https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
-        />
+        {GEOAPIFY_API_KEY ? (
+          <TileLayer
+            attribution='Powered by <a href="https://www.geoapify.com/" target="_blank">Geoapify</a> | © OpenStreetMap contributors'
+            url={`https://maps.geoapify.com/v1/tile/${GEOAPIFY_MAP_STYLE}/{z}/{x}/{y}.png?apiKey=${GEOAPIFY_API_KEY}`}
+            maxZoom={20}
+          />
+        ) : (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+        )}
         {cities.map((city)=> (
           <Marker 
             key={city.id} 

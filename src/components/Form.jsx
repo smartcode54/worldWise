@@ -13,9 +13,9 @@ import { convertToEmoji } from "../utils";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-// Using Geoapify API
+// Using Geoapify API - credentials loaded from .env
 const BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
-const API_KEY = "e55a183b7d8749748a1832193dd86c74";
+const API_KEY = import.meta.env.VITE_GEOAPIFY_API_KEY;
 
 function Form() {  
   const [lat, lng] = useUrlPosition();
@@ -75,6 +75,10 @@ function Form() {
 
       
       try {
+        if (!API_KEY) {
+          throw new Error("Geoapify API key is missing. Please add VITE_GEOAPIFY_API_KEY to your .env file.");
+        }
+        
         setIsLoadingGeocoding(true);
         // Use URLSearchParams for proper URL encoding
         // Geoapify API format: apiKey, lat, lon, format=json

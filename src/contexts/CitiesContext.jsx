@@ -1,7 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useReducer, useEffect, useContext, useMemo, useCallback } from 'react';
 
-const DATABASE_URL = 'http://localhost:8000';
+// Database URL - loaded from .env file
+const DATABASE_URL = import.meta.env.VITE_DATABASE_URL || 'http://localhost:8000';
 
 const CitiesContext = createContext();
 
