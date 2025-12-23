@@ -10,15 +10,27 @@ This guide documents the performance optimization work done on the WorldWise app
 
 By the end of this guide, you will understand:
 
+### Part 1: Preventing Infinite Loops
+
 1. How to profile React applications for performance issues
 2. Why functions recreated on every render cause infinite loops
 3. How to use `useCallback` to memoize functions and prevent infinite loops
 4. The importance of ESLint warnings for identifying potential bugs
 5. Best practices for memoization in React Context
 
+### Part 2: Optimizing Bundle Size
+
+6. What a bundle is and why bundle size matters
+7. How code splitting and lazy loading work
+8. How to implement lazy loading with React's `lazy()` and `Suspense`
+9. Performance benefits of code splitting (30-40% faster initial load)
+10. Best practices for when to use lazy loading
+
 ---
 
 ## 📋 Table of Contents
+
+### Part 1: Preventing Infinite Loops
 
 1. [Profiling Results](#profiling-results)
 2. [The Infinite Loop Problem](#the-infinite-loop-problem)
@@ -28,6 +40,20 @@ By the end of this guide, you will understand:
 6. [ESLint Warnings](#eslint-warnings)
 7. [Best Practices](#best-practices)
 8. [Complete Code Example](#complete-code-example)
+
+### Part 2: Optimizing Bundle Size
+
+9. [Code Splitting Comparison](#-code-splitting-comparison-initial-vs-lazy-loading)
+10. [Bundle Analysis](#-actual-bundle-analysis-current-build)
+11. [Performance Comparison](#-performance-comparison)
+12. [Real-World User Experience](#-real-world-user-experience)
+13. [Implementation Steps](#-implementation-steps)
+14. [Best Practices for Code Splitting](#-best-practices-for-code-splitting)
+15. [Bundle Analysis Breakdown](#-bundle-analysis-breakdown)
+16. [Key Performance Insights](#-key-performance-insights)
+17. [Mobile Performance Impact](#-mobile-performance-impact)
+18. [Testing Recommendations](#-testing-recommendations)
+19. [Quick Reference](#-quick-reference-performance-metrics)
 
 ---
 
@@ -60,12 +86,12 @@ After profiling the WorldWise application using React DevTools Profiler:
 // ❌ BAD: Function recreated on every render
 function CitiesProvider({ children }) {
   const [cities, setCities] = useState([]);
-  
+
   // This function is recreated on EVERY render
   const getCity = (id) => {
-    return cities.find(city => city.id === parseInt(id));
+    return cities.find((city) => city.id === parseInt(id));
   };
-  
+
   return (
     <CitiesContext.Provider value={{ cities, getCity }}>
       {children}
@@ -80,12 +106,12 @@ function CitiesProvider({ children }) {
 // Component using getCity in useEffect
 function CityComponent({ id }) {
   const { getCity } = useCities();
-  
+
   useEffect(() => {
     const city = getCity(id);
     // Do something with city
   }, [id, getCity]); // ⚠️ getCity changes on every render!
-  
+
   // This causes:
   // 1. Component renders
   // 2. getCity is recreated (new reference)
@@ -106,7 +132,7 @@ In JavaScript, functions are objects. When you define a function inside a compon
 
 ```javascript
 const getCity = (id) => {
-  return cities.find(city => city.id === parseInt(id));
+  return cities.find((city) => city.id === parseInt(id));
 };
 ```
 
@@ -161,13 +187,14 @@ const memoizedFunction = useCallback(
 // ✅ GOOD: Function memoized with useCallback
 const getCity = useCallback(
   (id) => {
-    return cities.find(city => city.id === parseInt(id));
+    return cities.find((city) => city.id === parseInt(id));
   },
   [cities] // Only recreate if cities array changes
 );
 ```
 
 **Now:**
+
 - `getCity` has the **same reference** across renders (unless `cities` changes)
 - `useEffect` sees no change → doesn't re-run
 - **No infinite loop!**
@@ -203,7 +230,7 @@ function CitiesProvider({ children }) {
   // ✅ CRITICAL: Memoize getCity with cities dependency
   const getCity = useCallback(
     (id) => {
-      return cities.find(city => city.id === parseInt(id));
+      return cities.find((city) => city.id === parseInt(id));
     },
     [cities] // Recreate only when cities changes
   );
@@ -253,7 +280,7 @@ const value = useMemo(
     currentCity,
     isLoadingCity,
     error,
-    getCity,        // ✅ All functions are memoized
+    getCity, // ✅ All functions are memoized
     selectedCityId,
     handleCityClick,
     setSelectedCityId,
@@ -264,9 +291,7 @@ const value = useMemo(
 );
 
 return (
-  <CitiesContext.Provider value={value}>
-    {children}
-  </CitiesContext.Provider>
+  <CitiesContext.Provider value={value}>{children}</CitiesContext.Provider>
 );
 ```
 
@@ -303,6 +328,7 @@ useEffect(() => {
 ```
 
 **The warning tells you:**
+
 - `getCity` is used but not in dependencies
 - This could cause stale closures or missing updates
 - If you add it without memoizing, you'll get an infinite loop
@@ -313,13 +339,13 @@ Ensure your ESLint config includes React Hooks rules:
 
 ```javascript
 // eslint.config.js
-import reactHooks from 'eslint-plugin-react-hooks';
+import reactHooks from "eslint-plugin-react-hooks";
 
 export default {
-  plugins: ['react-hooks'],
+  plugins: ["react-hooks"],
   rules: {
-    'react-hooks/rules-of-hooks': 'error',
-    'react-hooks/exhaustive-deps': 'warn', // ⚠️ Important!
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn", // ⚠️ Important!
   },
 };
 ```
@@ -339,15 +365,18 @@ export default {
 
 ```javascript
 // ✅ DO: Memoize all functions passed through context
-const getCity = useCallback((id) => {
-  return cities.find(city => city.id === parseInt(id));
-}, [cities]);
+const getCity = useCallback(
+  (id) => {
+    return cities.find((city) => city.id === parseInt(id));
+  },
+  [cities]
+);
 ```
 
 ```javascript
 // ❌ DON'T: Create functions without memoization
 const getCity = (id) => {
-  return cities.find(city => city.id === parseInt(id));
+  return cities.find((city) => city.id === parseInt(id));
 };
 ```
 
@@ -357,7 +386,7 @@ const getCity = (id) => {
 // ✅ DO: Include all dependencies
 const getCity = useCallback(
   (id) => {
-    return cities.find(city => city.id === parseInt(id));
+    return cities.find((city) => city.id === parseInt(id));
   },
   [cities] // ✅ cities is used in the function
 );
@@ -367,7 +396,7 @@ const getCity = useCallback(
 // ❌ DON'T: Forget dependencies or use wrong ones
 const getCity = useCallback(
   (id) => {
-    return cities.find(city => city.id === parseInt(id));
+    return cities.find((city) => city.id === parseInt(id));
   },
   [] // ❌ Missing cities dependency - stale closure!
 );
@@ -377,22 +406,27 @@ const getCity = useCallback(
 
 ```javascript
 // ✅ DO: Memoize the entire context value
-const value = useMemo(() => ({
-  cities,
-  getCity,
-  // ... other values
-}), [cities, getCity, /* ... */]);
+const value = useMemo(
+  () => ({
+    cities,
+    getCity,
+    // ... other values
+  }),
+  [cities, getCity /* ... */]
+);
 ```
 
 ### 4. When to Use useCallback
 
 Use `useCallback` when a function is:
+
 - ✅ Passed through Context
 - ✅ Used in `useEffect` dependency arrays
 - ✅ Passed as props to memoized components (`React.memo`)
 - ✅ Used as a dependency in other hooks
 
 **Don't use `useCallback` for:**
+
 - ❌ Functions only used in event handlers (unless passed to memoized children)
 - ❌ Functions that don't need referential equality
 - ❌ Premature optimization without a clear need
@@ -405,7 +439,7 @@ Use `useCallback` when a function is:
 // ❌ WRONG: cities.items doesn't exist (cities is an array)
 const handleCityClick = useCallback(
   async (cityId) => {
-    const city = cities.find(c => c.id === parseInt(cityId));
+    const city = cities.find((c) => c.id === parseInt(cityId));
     // ...
   },
   [cities.items] // ❌ Should be [cities]
@@ -416,7 +450,7 @@ const handleCityClick = useCallback(
 // ✅ CORRECT: Use the actual dependency
 const handleCityClick = useCallback(
   async (cityId) => {
-    const city = cities.find(c => c.id === parseInt(cityId));
+    const city = cities.find((c) => c.id === parseInt(cityId));
     // ...
   },
   [cities] // ✅ Correct
@@ -429,7 +463,7 @@ const handleCityClick = useCallback(
 // ❌ WRONG: Missing cities dependency
 const getCity = useCallback(
   (id) => {
-    return cities.find(city => city.id === parseInt(id));
+    return cities.find((city) => city.id === parseInt(id));
   },
   [] // ❌ Will have stale cities reference
 );
@@ -453,7 +487,7 @@ const formatDate = useCallback((date) => {
 ```javascript
 /**
  * CitiesContext - Performance Optimized
- * 
+ *
  * KEY PERFORMANCE OPTIMIZATIONS:
  * 1. All context functions are memoized with useCallback to prevent infinite loops
  * 2. Context value is memoized with useMemo to prevent unnecessary re-renders
@@ -604,9 +638,7 @@ function CitiesProvider({ children }) {
   );
 
   return (
-    <CitiesContext.Provider value={value}>
-      {children}
-    </CitiesContext.Provider>
+    <CitiesContext.Provider value={value}>{children}</CitiesContext.Provider>
   );
 }
 
@@ -642,58 +674,3 @@ function City() {
 ```
 
 ---
-
-## 📊 Summary
-
-### Key Takeaways
-
-1. **Profiling revealed no significant bottlenecks** - The main issue was infinite loops, not performance
-2. **Functions recreated on every render cause infinite loops** - When used in `useEffect` dependency arrays
-3. **`useCallback` stabilizes functions** - Prevents infinite loops by maintaining referential equality
-4. **ESLint warnings are valuable** - They identify potential bugs and enforce best practices
-
-### When to Memoize
-
-✅ **Always memoize:**
-- Functions passed through Context
-- Functions used in `useEffect` dependency arrays
-- Functions passed to memoized components
-
-❌ **Don't over-memoize:**
-- Simple local functions
-- Functions not used as dependencies
-- Premature optimization without clear need
-
-### The Fix Checklist
-
-- [ ] Identify functions passed through context
-- [ ] Wrap all context functions with `useCallback`
-- [ ] Include correct dependencies in `useCallback`
-- [ ] Memoize the context value with `useMemo`
-- [ ] Verify ESLint warnings are resolved
-- [ ] Test for infinite loops
-- [ ] Profile to confirm no performance issues
-
----
-
-## 🔗 Related Topics
-
-- [Context API Guide](./229-CONTEXT_API_GUIDE.md)
-- [State Management with Pure Reducer](./237-STATE_MANAGEMENT_WITH_PURE_REDUCER.md)
-- React Hooks Documentation: [useCallback](https://react.dev/reference/react/useCallback)
-- React Hooks Documentation: [useMemo](https://react.dev/reference/react/useMemo)
-
----
-
-## 🎓 Practice Exercise
-
-1. **Identify the Problem**: Find a component that uses a context function in `useEffect`
-2. **Check Memoization**: Verify the function is memoized with `useCallback`
-3. **Fix if Needed**: Add `useCallback` if missing
-4. **Test**: Verify no infinite loops occur
-5. **Profile**: Use React DevTools to confirm optimal performance
-
----
-
-**Remember:** Performance optimization is important, but preventing bugs (like infinite loops) is even more critical. Always memoize functions that are used as dependencies!
-
