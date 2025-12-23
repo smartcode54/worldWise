@@ -59,6 +59,30 @@
         "lng": 99.651489
       },
       "id": 5
+    },
+    {
+      "cityName": "Jebrat al Sheikh",
+      "country": "Sudan",
+      "emoji": "🇸🇩",
+      "date": "2025-12-23T04:58:45.898Z",
+      "notes": "",
+      "position": {
+        "lat": 14.604847,
+        "lng": 31.289063
+      },
+      "id": 6
+    },
+    {
+      "cityName": "Nord Kanem",
+      "country": "Chad",
+      "emoji": "🇹🇩",
+      "date": "2025-12-23T05:01:18.108Z",
+      "notes": "",
+      "position": {
+        "lat": 14.902322,
+        "lng": 14.963379
+      },
+      "id": 7
     }
   ]
 }

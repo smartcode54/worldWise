@@ -1,11 +1,11 @@
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect } from "react";
 import styles from "./City.module.css";
 import BackButton from "./BackButton";
-import { useCities } from '../contexts/CitiesContext';
+import { useCities } from "../contexts/CitiesContext";
 
 const formatDate = (date) => {
-  if (!date) return 'No date available';
+  if (!date) return "No date available";
   try {
     return new Intl.DateTimeFormat("en", {
       day: "numeric",
@@ -14,7 +14,7 @@ const formatDate = (date) => {
       weekday: "long",
     }).format(new Date(date));
   } catch {
-    return 'Invalid date';
+    return "Invalid date";
   }
 };
 
@@ -23,7 +23,10 @@ function City() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { getCity, setSelectedCityId } = useCities();
-  
+
+  // ✅ setSelectedCityId is memoized with useCallback in CitiesContext,
+  // so it maintains referential equality and is safe to include in dependencies
+  // Without memoization, this would cause an infinite loop
   useEffect(() => {
     if (id) {
       setSelectedCityId(parseInt(id));
@@ -33,11 +36,11 @@ function City() {
       // Optional: clear selection when leaving city detail page
     };
   }, [id, setSelectedCityId]);
-  
+
   // Get latitude and longitude from URL params
   const lat = searchParams.get("lat");
   const lng = searchParams.get("lng");
-  
+
   // Get the city by ID from context
   const currentCity = getCity(id);
 
@@ -46,7 +49,7 @@ function City() {
     return (
       <div className={styles.city}>
         <p>City not found</p>
-        <button onClick={() => navigate('/app/cities')}>Back to Cities</button>
+        <button onClick={() => navigate("/app/cities")}>Back to Cities</button>
       </div>
     );
   }
@@ -78,8 +81,8 @@ function City() {
         <div className={styles.row}>
           <h6>Position</h6>
           <p>
-            Latitude: {lat || 'Select on list'}, <br />
-            Longitude: {lng || 'Select on list'}
+            Latitude: {lat || "Select on list"}, <br />
+            Longitude: {lng || "Select on list"}
           </p>
         </div>
       )}
